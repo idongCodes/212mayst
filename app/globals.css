@@ -1,41 +1,54 @@
-@import "tailwindcss";
-
+/* RESET & VARIABLES */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-
-  /* Palette Definitions */
   --sky-blue: #87CEEB;
   --sandy-brown: #F4A460;
   --light-green: #90EE90;
-  --white: #ffffff;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  
-  /* Font Update: Comic Sans */
-  --font-sans: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-  --font-mono: var(--font-geist-mono);
-
-  /* Custom Palette */
-  --color-sky-blue: var(--sky-blue);
-  --color-sandy-brown: var(--sandy-brown);
-  --color-light-green: var(--light-green);
-  --color-white: var(--white);
+  --bg-color: #ffffff;
+  --text-color: #171717;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-color: #0a0a0a;
+    --text-color: #ededed;
   }
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  /* Apply the font variable globally */
-  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  padding-bottom: 100px; /* Space for footer/nav */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", sans-serif;
+}
+
+/* LINKS */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.5s ease-out forwards;
+}
+
+.animate-slide-in {
+  opacity: 0;
+  animation: slideIn 1s ease-out 0.5s forwards;
 }
