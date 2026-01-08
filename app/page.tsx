@@ -1,5 +1,7 @@
 import Image from "next/image";
-import Link from "next/link"; // Import Link
+import Link from "next/link";
+// Import icons for the features
+import { MessageCircle, Calendar, ClipboardList } from "lucide-react";
 
 export default function Home() {
   return (
@@ -73,14 +75,13 @@ export default function Home() {
               fontSize: '1.25rem', 
               fontWeight: '500', 
               color: 'white',
-              marginBottom: '2rem', /* Added space for buttons */
+              marginBottom: '2rem',
               textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
             }}
           >
             Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
           </p>
 
-          {/* NEW BUTTONS */}
           <div style={{ display: 'flex', gap: '15px' }}>
             <Link href="/login" className="hero-btn btn-login">
               Login
@@ -89,11 +90,83 @@ export default function Home() {
               Join 212 May St
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* NEW FEATURES SECTION (Solid Sky Blue) */}
+      <section 
+        style={{ 
+          backgroundColor: 'var(--sky-blue)', 
+          padding: '4rem 2rem', 
+          display: 'flex', 
+          justifyContent: 'center' 
+        }}
+      >
+        <div 
+          style={{ 
+            maxWidth: '1200px', 
+            width: '100%', 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '2rem', 
+            justifyContent: 'center' 
+          }}
+        >
+          {/* Feature 1 */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            borderRadius: '20px', 
+            padding: '2rem', 
+            flex: '1 1 300px', // Responsive flex basis
+            boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+            textAlign: 'center',
+            color: 'var(--text-color)'
+          }}>
+            <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+              <MessageCircle size={48} />
+            </div>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>House Chat</h3>
+            <p style={{ color: 'gray' }}>Stay connected with everyone. Coordinate plans, share updates, or just say hi.</p>
+          </div>
+
+          {/* Feature 2 */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            borderRadius: '20px', 
+            padding: '2rem', 
+            flex: '1 1 300px',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+            textAlign: 'center',
+            color: 'var(--text-color)'
+          }}>
+            <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+              <Calendar size={48} />
+            </div>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Events & Plans</h3>
+            <p style={{ color: 'gray' }}>Never miss a house dinner or movie night. check the calendar and join in.</p>
+          </div>
+
+          {/* Feature 3 */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            borderRadius: '20px', 
+            padding: '2rem', 
+            flex: '1 1 300px',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+            textAlign: 'center',
+            color: 'var(--text-color)'
+          }}>
+            <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+              <ClipboardList size={48} />
+            </div>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Tasks & Chores</h3>
+            <p style={{ color: 'gray' }}>Keep the house running smoothly. See what needs doing and lend a hand.</p>
+          </div>
 
         </div>
       </section>
 
-      {/* Content Section */}
+      {/* Existing Content Section */}
       <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
         <div 
           style={{ 
