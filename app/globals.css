@@ -52,3 +52,42 @@ a {
   opacity: 0;
   animation: slideIn 1s ease-out 0.5s forwards;
 }
+
+/* HERO BUTTONS */
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-align: center;
+}
+
+.hero-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+/* Join Button: Sandy Brown to stand out */
+.btn-join {
+  background-color: var(--sandy-brown);
+  color: white;
+  border: 2px solid var(--sandy-brown);
+}
+
+/* Login Button: Glassy Outline */
+.btn-login {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 2px solid white;
+  backdrop-filter: blur(5px);
+}
+
+.btn-login:hover {
+  background-color: white;
+  color: var(--sky-blue); /* Text turns blue on white background */
+}
