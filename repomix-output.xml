@@ -41,6 +41,23 @@ The content is organized as follows:
 
 <directory_structure>
 app/
+  about/
+    page.tsx
+  chat/
+    page.tsx
+  common-room/
+    page.tsx
+  components/
+    Footer.tsx
+    Navigation.tsx
+  contact/
+    page.tsx
+  mates/
+    page.tsx
+  my-room/
+    page.tsx
+  notifications/
+    page.tsx
   favicon.ico
   globals.css
   layout.tsx
@@ -48,6 +65,8 @@ app/
 public/
   file.svg
   globe.svg
+  hero.png
+  heroVid.mov
   logo.png
   next.svg
   vercel.svg
@@ -64,100 +83,69 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/globals.css">
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+<file path="app/about/page.tsx">
+export default function About() {
+  return <div className="p-4 text-center">About</div>;
 }
 </file>
 
-<file path="app/page.tsx">
-import Image from "next/image";
+<file path="app/chat/page.tsx">
+export default function Chat() {
+  return <div className="p-4 text-center">House Chat</div>;
+}
+</file>
 
-export default function Home() {
+<file path="app/common-room/page.tsx">
+export default function CommonRoom() {
+  return <div className="p-4 text-center">Common Room</div>;
+}
+</file>
+
+<file path="app/components/Footer.tsx">
+import Link from "next/link";
+
+export default function Footer() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <footer className="w-full border-t border-gray-100 py-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+      <div className="flex flex-col gap-2">
+        <p>&copy; {new Date().getFullYear()} 212 May Street</p>
+        <p>
+          Built by{" "}
+          <Link 
+            href="https://idong-essien.vercel.app" 
+            target="_blank" 
+            className="font-bold text-[var(--sandy-brown)] transition-colors hover:text-[var(--sky-blue)]"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            idongCodes
+          </Link>
+        </p>
+      </div>
+    </footer>
   );
+}
+</file>
+
+<file path="app/contact/page.tsx">
+export default function Contact() {
+  return <div className="p-4 text-center">Contact</div>;
+}
+</file>
+
+<file path="app/mates/page.tsx">
+export default function Mates() {
+  return <div className="p-4 text-center">Mates</div>;
+}
+</file>
+
+<file path="app/my-room/page.tsx">
+export default function MyRoom() {
+  return <div className="p-4 text-center">My Room</div>;
+}
+</file>
+
+<file path="app/notifications/page.tsx">
+export default function Notifications() {
+  return <div className="p-4 text-center">Notifications</div>;
 }
 </file>
 
@@ -256,35 +244,6 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 </file>
 
-<file path="package.json">
-{
-  "name": "212mayst",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
-</file>
-
 <file path="postcss.config.mjs">
 const config = {
   plugins: {
@@ -371,24 +330,271 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 }
 </file>
 
+<file path="app/components/Navigation.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, Armchair, Bed, Users, Bell, Info, Mail, MessageCircle } from "lucide-react";
+
+export default function Navigation() {
+  const pathname = usePathname();
+  const isActive = (path: string) => pathname === path;
+
+  // Helper for Link Styles
+  const getLinkStyle = (path: string) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af', // Gray fallback
+    fontWeight: isActive(path) ? 'bold' : 'normal',
+    transition: 'color 0.2s ease'
+  });
+
+  return (
+    <>
+      {/* Bottom Nav Bar */}
+      <nav 
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          left: '1rem',
+          zIndex: 100,
+          display: 'flex',
+          gap: '15px',
+          alignItems: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: '50px',
+          padding: '12px 20px',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <Link href="/" style={getLinkStyle("/")}><Home size={20} /></Link>
+        <Link href="/common-room" style={getLinkStyle("/common-room")}><Armchair size={20} /></Link>
+        <Link href="/my-room" style={getLinkStyle("/my-room")}><Bed size={20} /></Link>
+        <Link href="/mates" style={getLinkStyle("/mates")}><Users size={20} /></Link>
+        <Link href="/notifications" style={getLinkStyle("/notifications")}><Bell size={20} /></Link>
+        <Link href="/about" style={getLinkStyle("/about")}><Info size={20} /></Link>
+        <Link href="/contact" style={getLinkStyle("/contact")}><Mail size={20} /></Link>
+      </nav>
+
+      {/* Chat Button */}
+      <Link
+        href="/chat"
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          right: '1rem',
+          zIndex: 100,
+          height: '48px',
+          width: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'var(--light-green)',
+          color: isActive("/chat") ? 'white' : '#171717',
+          borderRadius: '50%',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          border: isActive("/chat") ? '2px solid white' : 'none'
+        }}
+      >
+        <MessageCircle size={24} />
+      </Link>
+    </>
+  );
+}
+</file>
+
+<file path="app/page.tsx">
+import Image from "next/image";
+
+export default function Home() {
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* HERO SECTION */}
+      <section 
+        style={{
+          position: 'relative',
+          height: '70vh', /* FORCE HEIGHT */
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center', /* Vertically Center */
+          justifyContent: 'flex-start', /* Left Align */
+          overflow: 'hidden',
+          padding: '0 2rem' /* Side padding */
+        }}
+      >
+        {/* Background Image Container */}
+        <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+          <Image
+            src="/hero.png"
+            alt="Housemates"
+            fill
+            priority
+            style={{ objectFit: 'cover', objectPosition: 'center' }}
+          />
+          {/* Overlay */}
+          <div 
+            style={{ 
+              position: 'absolute', 
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'var(--sky-blue)', 
+              opacity: 0.6 
+            }} 
+          /> 
+        </div>
+
+        {/* Text Content */}
+        <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
+          <h1 
+            style={{ 
+              fontSize: '3.5rem', 
+              fontWeight: 'bold', 
+              color: 'white', 
+              marginBottom: '1rem',
+              textShadow: '0 5px 5px rgba(0,0,0,0.5)'
+            }}
+          >
+            212 May Street
+          </h1>
+          <p 
+            style={{ 
+              fontSize: '1.25rem', 
+              fontWeight: '500', 
+              color: 'white',
+              textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
+            }}
+          >
+            Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
+          </p>
+        </div>
+      </section>
+
+      {/* Content Section */}
+      <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
+        <div 
+          style={{ 
+            backgroundColor: 'var(--bg-color)', 
+            padding: '2rem', 
+            borderRadius: '20px', 
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
+          }}
+        >
+          <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+            What's New?
+          </h2>
+          <p style={{ color: 'gray' }}>
+            Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.
+          </p>
+        </div>
+      </section>
+
+    </main>
+  );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "212mayst",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.562.0",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="app/globals.css">
+/* RESET & VARIABLES */
+:root {
+  --sky-blue: #87CEEB;
+  --sandy-brown: #F4A460;
+  --light-green: #90EE90;
+  --bg-color: #ffffff;
+  --text-color: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #0a0a0a;
+    --text-color: #ededed;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  padding-bottom: 100px; /* Space for footer/nav */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: "Comic Sans MS", "Chalkboard SE", "Comic Neue", sans-serif;
+}
+
+/* LINKS */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.5s ease-out forwards;
+}
+
+.animate-slide-in {
+  opacity: 0;
+  animation: slideIn 1s ease-out 0.5s forwards;
+}
+</file>
+
 <file path="app/layout.tsx">
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import "./globals.css"; 
+import Image from "next/image";
+import Link from "next/link";
+import Navigation from "./components/Navigation";
+import Footer from "./components/Footer";
 
 export const metadata: Metadata = {
   title: "212 May Street",
-  description: "A web app where housemates at 212 May Street can come together with shared experiences, memories, plans and manage tasks.",
+  description: "A web app for 212 May Street housemates.",
 };
 
 export default function RootLayout({
@@ -398,10 +604,41 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
+        {/* HEADER */}
+        <header 
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
+            width: '100%',
+            padding: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(135, 206, 235, 0.6)', /* Sky Blue Glass */
+            backdropFilter: 'blur(10px)',
+            borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          }}
+        >
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Image 
+              src="/logo.png" 
+              alt="Logo" 
+              width={32} 
+              height={32} 
+              style={{ height: '32px', width: 'auto' }}
+            />
+            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>
+              212 May St
+            </h1>
+          </Link>
+        </header>
+
         {children}
+
+        <Footer />
+        <Navigation />
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link"; // Import Link
 
 export default function Home() {
   return (
@@ -8,36 +9,53 @@ export default function Home() {
       <section 
         style={{
           position: 'relative',
-          height: '70vh', /* FORCE HEIGHT */
+          height: '70vh', 
           width: '100%',
           display: 'flex',
-          alignItems: 'center', /* Vertically Center */
-          justifyContent: 'flex-start', /* Left Align */
+          alignItems: 'center', 
+          justifyContent: 'flex-start', 
           overflow: 'hidden',
-          padding: '0 2rem' /* Side padding */
+          padding: '0 2rem' 
         }}
       >
-        {/* Background Image Container */}
+        {/* Background Video Container */}
         <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <Image
-            src="/hero.png"
-            alt="Housemates"
-            fill
-            priority
-            style={{ objectFit: 'cover', objectPosition: 'center' }}
-          />
-          {/* Overlay */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover', 
+              objectPosition: 'center' 
+            }}
+          >
+            <source src="/heroVid.mov" />
+            Your browser does not support the video tag.
+          </video>
+
+          {/* Vignette & Fade Layers */}
           <div 
             style={{ 
               position: 'absolute', 
               top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'var(--sky-blue)', 
-              opacity: 0.6 
+              background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)',
+              opacity: 0.8 
             }} 
           /> 
+          <div 
+            style={{ 
+              position: 'absolute', 
+              bottom: 0, left: 0, right: 0, 
+              height: '30%', 
+              background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)',
+            }} 
+          />
         </div>
 
-        {/* Text Content */}
+        {/* Text Content + Buttons */}
         <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
           <h1 
             style={{ 
@@ -55,11 +73,23 @@ export default function Home() {
               fontSize: '1.25rem', 
               fontWeight: '500', 
               color: 'white',
+              marginBottom: '2rem', /* Added space for buttons */
               textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
             }}
           >
             Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
           </p>
+
+          {/* NEW BUTTONS */}
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <Link href="/login" className="hero-btn btn-login">
+              Login
+            </Link>
+            <Link href="/join" className="hero-btn btn-join">
+              Join 212 May St
+            </Link>
+          </div>
+
         </div>
       </section>
 
