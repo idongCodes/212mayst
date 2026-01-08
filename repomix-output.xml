@@ -49,6 +49,7 @@ app/
     page.tsx
   components/
     Footer.tsx
+    Header.tsx
     Navigation.tsx
   contact/
     page.tsx
@@ -121,6 +122,51 @@ export default function Footer() {
         </p>
       </div>
     </footer>
+  );
+}
+</file>
+
+<file path="app/components/Header.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export default function Header() {
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+
+  // If we are on the Home page, render NOTHING.
+  if (isHome) return null;
+
+  // Otherwise, render the standard Sky Blue Glass header
+  return (
+    <header 
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        width: '100%',
+        padding: '1rem',
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: 'rgba(135, 206, 235, 0.6)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+      }}
+    >
+      <Link href="/" style={{ textDecoration: 'none' }}>
+        <h1 style={{ 
+          margin: 0, 
+          fontSize: '1.5rem', 
+          fontWeight: 'bold',
+          color: 'var(--text-color)'
+        }}>
+          212 May St
+        </h1>
+      </Link>
+    </header>
   );
 }
 </file>
@@ -407,96 +453,6 @@ export default function Navigation() {
 }
 </file>
 
-<file path="app/page.tsx">
-import Image from "next/image";
-
-export default function Home() {
-  return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      
-      {/* HERO SECTION */}
-      <section 
-        style={{
-          position: 'relative',
-          height: '70vh', /* FORCE HEIGHT */
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center', /* Vertically Center */
-          justifyContent: 'flex-start', /* Left Align */
-          overflow: 'hidden',
-          padding: '0 2rem' /* Side padding */
-        }}
-      >
-        {/* Background Image Container */}
-        <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <Image
-            src="/hero.png"
-            alt="Housemates"
-            fill
-            priority
-            style={{ objectFit: 'cover', objectPosition: 'center' }}
-          />
-          {/* Overlay */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'var(--sky-blue)', 
-              opacity: 0.6 
-            }} 
-          /> 
-        </div>
-
-        {/* Text Content */}
-        <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
-          <h1 
-            style={{ 
-              fontSize: '3.5rem', 
-              fontWeight: 'bold', 
-              color: 'white', 
-              marginBottom: '1rem',
-              textShadow: '0 5px 5px rgba(0,0,0,0.5)'
-            }}
-          >
-            212 May Street
-          </h1>
-          <p 
-            style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: '500', 
-              color: 'white',
-              textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
-            }}
-          >
-            Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
-          </p>
-        </div>
-      </section>
-
-      {/* Content Section */}
-      <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
-        <div 
-          style={{ 
-            backgroundColor: 'var(--bg-color)', 
-            padding: '2rem', 
-            borderRadius: '20px', 
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
-          }}
-        >
-          <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-            What's New?
-          </h2>
-          <p style={{ color: 'gray' }}>
-            Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.
-          </p>
-        </div>
-      </section>
-
-    </main>
-  );
-}
-</file>
-
 <file path="package.json">
 {
   "name": "212mayst",
@@ -524,6 +480,126 @@ export default function Home() {
     "tailwindcss": "^4",
     "typescript": "^5"
   }
+}
+</file>
+
+<file path="app/page.tsx">
+import Image from "next/image";
+import Link from "next/link"; // Import Link
+
+export default function Home() {
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* HERO SECTION */}
+      <section 
+        style={{
+          position: 'relative',
+          height: '70vh', 
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center', 
+          justifyContent: 'flex-start', 
+          overflow: 'hidden',
+          padding: '0 2rem' 
+        }}
+      >
+        {/* Background Video Container */}
+        <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover', 
+              objectPosition: 'center' 
+            }}
+          >
+            <source src="/heroVid.mov" />
+            Your browser does not support the video tag.
+          </video>
+
+          {/* Vignette & Fade Layers */}
+          <div 
+            style={{ 
+              position: 'absolute', 
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)',
+              opacity: 0.8 
+            }} 
+          /> 
+          <div 
+            style={{ 
+              position: 'absolute', 
+              bottom: 0, left: 0, right: 0, 
+              height: '30%', 
+              background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)',
+            }} 
+          />
+        </div>
+
+        {/* Text Content + Buttons */}
+        <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
+          <h1 
+            style={{ 
+              fontSize: '3.5rem', 
+              fontWeight: 'bold', 
+              color: 'white', 
+              marginBottom: '1rem',
+              textShadow: '0 5px 5px rgba(0,0,0,0.5)'
+            }}
+          >
+            212 May Street
+          </h1>
+          <p 
+            style={{ 
+              fontSize: '1.25rem', 
+              fontWeight: '500', 
+              color: 'white',
+              marginBottom: '2rem', /* Added space for buttons */
+              textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
+            }}
+          >
+            Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
+          </p>
+
+          {/* NEW BUTTONS */}
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <Link href="/login" className="hero-btn btn-login">
+              Login
+            </Link>
+            <Link href="/join" className="hero-btn btn-join">
+              Join 212 May St
+            </Link>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Content Section */}
+      <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
+        <div 
+          style={{ 
+            backgroundColor: 'var(--bg-color)', 
+            padding: '2rem', 
+            borderRadius: '20px', 
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
+          }}
+        >
+          <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+            What's New?
+          </h2>
+          <p style={{ color: 'gray' }}>
+            Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.
+          </p>
+        </div>
+      </section>
+
+    </main>
+  );
 }
 </file>
 
@@ -582,15 +658,53 @@ a {
   opacity: 0;
   animation: slideIn 1s ease-out 0.5s forwards;
 }
+
+/* HERO BUTTONS */
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-align: center;
+}
+
+.hero-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+/* Join Button: Sandy Brown to stand out */
+.btn-join {
+  background-color: var(--sandy-brown);
+  color: white;
+  border: 2px solid var(--sandy-brown);
+}
+
+/* Login Button: Glassy Outline */
+.btn-login {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 2px solid white;
+  backdrop-filter: blur(5px);
+}
+
+.btn-login:hover {
+  background-color: white;
+  color: var(--sky-blue); /* Text turns blue on white background */
+}
 </file>
 
 <file path="app/layout.tsx">
 import type { Metadata } from "next";
 import "./globals.css"; 
-import Image from "next/image";
-import Link from "next/link";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
+import Header from "./components/Header"; // Import the new component
 
 export const metadata: Metadata = {
   title: "212 May Street",
@@ -605,35 +719,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* HEADER */}
-        <header 
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 1000,
-            width: '100%',
-            padding: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: 'rgba(135, 206, 235, 0.6)', /* Sky Blue Glass */
-            backdropFilter: 'blur(10px)',
-            borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-          }}
-        >
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Image 
-              src="/logo.png" 
-              alt="Logo" 
-              width={32} 
-              height={32} 
-              style={{ height: '32px', width: 'auto' }}
-            />
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>
-              212 May St
-            </h1>
-          </Link>
-        </header>
+        {/* New Client Header handles logic for Home vs Pages */}
+        <Header />
 
         {children}
 
