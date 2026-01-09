@@ -53,6 +53,19 @@ a {
   animation: slideIn 1s ease-out 0.5s forwards;
 }
 
+/* SCROLL ANIMATIONS */
+.fade-in-section {
+  opacity: 0;
+  transform: translateY(30px); /* Start 30px lower */
+  transition: opacity 1s ease-out, transform 1s ease-out;
+  will-change: opacity, visibility;
+}
+
+.fade-in-section.is-visible {
+  opacity: 1;
+  transform: translateY(0); /* Slide up to original position */
+}
+
 /* HERO BUTTONS */
 .hero-btn {
   display: inline-flex;
@@ -90,31 +103,4 @@ a {
 .btn-login:hover {
   background-color: white;
   color: var(--sky-blue); /* Text turns blue on white background */
-}
-
-/* SCROLL ANIMATIONS */
-.fade-in-section {
-  opacity: 0;
-  transform: translateY(30px); /* Start 30px lower */
-  transition: opacity 1s ease-out, transform 1s ease-out;
-  will-change: opacity, visibility;
-}
-
-.fade-in-section.is-visible {
-  opacity: 1;
-  transform: translateY(0); /* Slide up to original position */
-}
-
-/* SPIN ANIMATION for Music Player */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-.animate-spin-slow {
-  animation: spin 3s linear infinite;
 }

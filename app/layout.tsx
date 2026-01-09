@@ -3,7 +3,6 @@ import "./globals.css";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import Header from "./components/Header"; 
-import GlobalPlayer from "./components/GlobalPlayer"; // Import the Player
 
 export const metadata: Metadata = {
   title: "212 May Street",
@@ -21,9 +20,6 @@ export default function RootLayout({
         <Header />
 
         {children}
-
-        {/* The Global Music Player lives here */}
-        <GlobalPlayer />
 
         <Footer />
         <Navigation />
