@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css"; 
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
-import Header from "./components/Header"; // Import the new component
+import Header from "./components/Header"; 
+import GlobalPlayer from "./components/GlobalPlayer"; // Import the Player
 
 export const metadata: Metadata = {
   title: "212 May Street",
@@ -17,10 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* New Client Header handles logic for Home vs Pages */}
         <Header />
 
         {children}
+
+        {/* The Global Music Player lives here */}
+        <GlobalPlayer />
 
         <Footer />
         <Navigation />
