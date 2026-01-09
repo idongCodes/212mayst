@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 
 export default function Header() {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  
+  // HIDE HEADER on: Home page AND About page
+  const isHidden = pathname === "/" || pathname === "/about";
 
-  // If we are on the Home page, render NOTHING.
-  if (isHome) return null;
+  if (isHidden) return null;
 
   // Otherwise, render the standard Sky Blue Glass header
   return (
