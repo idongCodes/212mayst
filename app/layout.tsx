@@ -1,6 +1,6 @@
 /**
  * file: app/layout.tsx
- * description: Updated metadata to explicitly use 'logo+favicon.ico' as the browser tab icon.
+ * description: Wrapped children in RouteGuard to enforce access control.
  */
 
 import type { Metadata } from "next";
@@ -8,6 +8,8 @@ import "./globals.css";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import Header from "./components/Header"; 
+import AutoLogout from "./components/AutoLogout"; 
+import RouteGuard from "./components/RouteGuard"; // <--- Import the Guard
 
 export const metadata: Metadata = {
   title: "212 May Street",
@@ -25,12 +27,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Header />
+        {/* Handles 15-min inactivity logout */}
+        <AutoLogout />
 
-        {children}
+        {/* Protects routes based on login status */}
+        <RouteGuard>
+          <Header />
+          
+          {children}
 
-        <Footer />
-        <Navigation />
+          <Footer />
+          <Navigation />
+        </RouteGuard>
       </body>
     </html>
   );

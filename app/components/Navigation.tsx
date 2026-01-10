@@ -1,26 +1,56 @@
+/**
+ * file: app/components/Navigation.tsx
+ * description: Added conditional Logout/Login icon based on session status.
+ */
+
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Armchair, Bed, Users, Bell, Info, Mail, MessageCircle } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Armchair, Bed, Users, Bell, Info, Mail, MessageCircle, LogOut, LogIn } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check login status whenever the path changes (e.g., after login or redirect)
+  useEffect(() => {
+    const checkLogin = () => {
+      const user = sessionStorage.getItem('212user');
+      setIsLoggedIn(!!user);
+    };
+    
+    checkLogin();
+    
+    // Optional: Add event listener if you have storage events, 
+    // but pathname dependency usually covers navigation-based changes.
+  }, [pathname]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('212user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
   const isActive = (path: string) => pathname === path;
 
-  // Helper for Link Styles
   const getLinkStyle = (path: string) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af', // Gray fallback
+    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af',
     fontWeight: isActive(path) ? 'bold' : 'normal',
-    transition: 'color 0.2s ease'
+    transition: 'color 0.2s ease',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0
   });
 
   return (
     <>
-      {/* Bottom Nav Bar */}
       <nav 
         style={{
           position: 'fixed',
@@ -30,7 +60,7 @@ export default function Navigation() {
           display: 'flex',
           gap: '15px',
           alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)', // Slightly higher opacity for icons
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255,255,255,0.3)',
           borderRadius: '50px',
@@ -44,10 +74,31 @@ export default function Navigation() {
         <Link href="/mates" style={getLinkStyle("/mates")}><Users size={20} /></Link>
         <Link href="/notifications" style={getLinkStyle("/notifications")}><Bell size={20} /></Link>
         <Link href="/about" style={getLinkStyle("/about")}><Info size={20} /></Link>
-        <Link href="/contact" style={getLinkStyle("/contact")}><Mail size={20} /></Link>
+        
+        {/* Separator */}
+        <div style={{ width: '1px', height: '20px', backgroundColor: '#e2e8f0' }}></div>
+
+        {/* Conditional Auth Icon */}
+        {isLoggedIn ? (
+          <button 
+            onClick={handleLogout} 
+            style={getLinkStyle("logout")} 
+            title="Log Out"
+          >
+            <LogOut size={20} color="#ef4444" /> {/* Red for logout */}
+          </button>
+        ) : (
+          <Link 
+            href="/login" 
+            style={getLinkStyle("/login")}
+            title="Log In"
+          >
+            <LogIn size={20} color="var(--sky-blue)" />
+          </Link>
+        )}
       </nav>
 
-      {/* Chat Button */}
+      {/* Chat Button (unchanged) */}
       <Link
         href="/chat"
         style={{
