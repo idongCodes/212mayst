@@ -1,13 +1,13 @@
 /**
  * file: app/common-room/page.tsx
- * description: Posts now display date in mm/dd/yyyy format + time.
+ * description: Added Reply functionality with Emoji Pickers in the reply inputs.
  */
 
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2 } from 'lucide-react';
-import { addPost, getPosts, editPost, deletePost, Post } from '../actions';
+import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2, MessageSquare } from 'lucide-react';
+import { addPost, getPosts, editPost, deletePost, addReply, Post } from '../actions';
 import Link from 'next/link';
 
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
@@ -19,9 +19,16 @@ export default function CommonRoom() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  // Edit State
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
+
+  // Reply State
+  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false); // <--- New State for Reply Emoji
   
   const [authorName, setAuthorName] = useState("Guest");
   const [isGuest, setIsGuest] = useState(true);
@@ -31,6 +38,7 @@ export default function CommonRoom() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -48,6 +56,7 @@ export default function CommonRoom() {
     }
   }, []);
 
+  // Auto-resize main textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'; 
@@ -55,16 +64,27 @@ export default function CommonRoom() {
     }
   }, [message]);
 
+  // Auto-resize reply textarea
+  useEffect(() => {
+    if (replyTextareaRef.current) {
+      replyTextareaRef.current.style.height = 'auto'; 
+      replyTextareaRef.current.style.height = `${replyTextareaRef.current.scrollHeight}px`; 
+    }
+  }, [replyText, replyingToId]);
+
   useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
 
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
+  
   const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
   
+  const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
+
   const handlePostSubmit = async () => {
     if (!message.trim()) return;
     setLoading(true);
-    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0 };
+    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0, replies: [] };
     setPosts([newPost, ...posts]);
     setMessage("");
     setShowEmojiPicker(false);
@@ -73,14 +93,43 @@ export default function CommonRoom() {
     setLoading(false);
   };
 
+  const handleReplySubmit = async (postId: number) => {
+    if (!replyText.trim()) return;
+    setReplyLoading(true);
+    
+    // Optimistic UI update
+    const newReply = {
+      id: Date.now(),
+      author: authorName,
+      content: replyText.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedPosts = posts.map(p => {
+      if (p.id === postId) {
+        return { ...p, replies: [...(p.replies || []), newReply] };
+      }
+      return p;
+    });
+    setPosts(updatedPosts);
+    setReplyText("");
+    setReplyingToId(null);
+    setShowReplyEmojiPicker(false);
+
+    await addReply(postId, newReply.content, authorName);
+    setReplyLoading(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
+  
+  const handleReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, postId: number) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReplySubmit(postId); } };
 
   const isEditable = (post: Post) => {
     if ((post.editCount || 0) >= 1) return false;
     return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000;
   };
 
-  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); };
+  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); setReplyingToId(null); };
   const cancelEditing = () => { setEditingId(null); setEditText(""); };
   
   const saveEdit = async () => {
@@ -102,10 +151,8 @@ export default function CommonRoom() {
     await deletePost(id);
   };
 
-  // UPDATED DATE FORMATTER
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    // mm/dd/yyyy, hh:mm am/pm
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: '2-digit', 
@@ -120,7 +167,7 @@ export default function CommonRoom() {
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         
-        {/* Header & Input UI (Unchanged) */}
+        {/* Header & Input UI */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
             {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
@@ -153,7 +200,7 @@ export default function CommonRoom() {
           <input type="file" ref={uploadInputRef} accept="image/*" hidden />
         </div>
 
-        {/* Feed with new Date Format */}
+        {/* Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
@@ -161,6 +208,8 @@ export default function CommonRoom() {
                 <User size={20} color="#0284c7" />
               </div>
               <div style={{ flex: 1 }}>
+                
+                {/* Post Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
@@ -178,6 +227,8 @@ export default function CommonRoom() {
                     )}
                   </div>
                 </div>
+
+                {/* Post Content or Edit Mode */}
                 {editingId === post.id ? (
                   <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
@@ -185,8 +236,76 @@ export default function CommonRoom() {
                     <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
                   </div>
                 ) : (
-                  <p style={{ margin: 0, color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                  <>
+                    <p style={{ margin: '0 0 10px 0', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                    
+                    {/* Reply Button */}
+                    <button 
+                      onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sandy-brown)', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', padding: 0 }}
+                    >
+                      <MessageSquare size={14} /> {replyingToId === post.id ? "Cancel Reply" : "Reply"}
+                    </button>
+                  </>
                 )}
+
+                {/* Reply Input */}
+                {replyingToId === post.id && (
+                  <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    
+                    {/* Reply Emoji Picker */}
+                    {showReplyEmojiPicker && (
+                      <div style={{ marginBottom: '5px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(30px, 1fr))', gap: '5px', width: '100%', maxHeight: '150px', overflowY: 'auto' }}>
+                        {COMMON_EMOJIS.map((emoji) => (
+                          <button key={emoji} onClick={() => handleReplyEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <textarea 
+                          ref={replyTextareaRef}
+                          placeholder="Write a reply..." 
+                          value={replyText} 
+                          onChange={(e) => setReplyText(e.target.value)} 
+                          onKeyDown={(e) => handleReplyKeyDown(e, post.id)}
+                          autoFocus
+                          rows={1}
+                          style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none', backgroundColor: '#f8fafc', resize: 'none', overflow: 'hidden', minHeight: '40px', fontFamily: 'inherit' }} 
+                        />
+                        <button 
+                          onClick={() => setShowReplyEmojiPicker(!showReplyEmojiPicker)} 
+                          style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}
+                        >
+                          <Smile size={18} />
+                        </button>
+                      </div>
+                      
+                      <button onClick={() => handleReplySubmit(post.id)} disabled={replyLoading} style={{ backgroundColor: 'var(--sky-blue)', color: 'white', border: 'none', borderRadius: '12px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        {replyLoading ? '...' : <Send size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Render Replies */}
+                {post.replies && post.replies.length > 0 && (
+                  <div style={{ marginTop: '1rem', borderLeft: '2px solid #f1f5f9', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {post.replies.map((reply) => (
+                      <div key={reply.id} style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{reply.author}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{formatDate(reply.timestamp)}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
               </div>
             </div>
           ))}

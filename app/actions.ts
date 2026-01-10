@@ -1,13 +1,13 @@
 /**
  * file: app/actions.ts
- * description: Fixed missing 'os' import.
+ * description: Fixed build error by adding missing 'Reply' type definition.
  */
 
 "use server";
 
 import fs from "fs/promises";
 import path from "path";
-import os from "os"; // <--- ADDED THIS IMPORT
+import os from "os"; // Required for temp dir
 import { revalidatePath } from "next/cache";
 
 // ============================================================================
@@ -41,7 +41,6 @@ export async function getPraises(): Promise<Praise[]> {
     const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
     return JSON.parse(data);
   } catch (error) {
-    // If file doesn't exist, create it with seed data
     await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
     return PRAISE_SEED_DATA;
   }
@@ -49,20 +48,16 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const praises = await getPraises();
-  
-  // Ensure timestamp is present
   const praiseWithDate = {
     ...newPraise,
     submittedAt: newPraise.submittedAt || new Date().toISOString()
   };
-
   const updatedPraises = [praiseWithDate, ...praises];
   await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
-  revalidatePath("/"); // Refresh Home page
+  revalidatePath("/"); 
   return updatedPraises;
 }
 
-// DELETE PRAISE (Admin)
 export async function deletePraise(id: number) {
   const praises = await getPraises();
   const updated = praises.filter(p => p.id !== id);
@@ -85,7 +80,7 @@ export type Feedback = {
   subject: string;
   message: string;
   submittedAt: string;
-  read?: boolean; // Track read status
+  read?: boolean; 
 };
 
 export async function getFeedback(): Promise<Feedback[]> {
@@ -99,7 +94,6 @@ export async function getFeedback(): Promise<Feedback[]> {
 
 export async function addFeedback(newFeedback: Feedback) {
   const list = await getFeedback();
-  // Ensure new feedback starts as unread
   const feedbackWithStatus = { ...newFeedback, read: false };
   const updated = [feedbackWithStatus, ...list];
   await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
@@ -107,7 +101,6 @@ export async function addFeedback(newFeedback: Feedback) {
   return updated;
 }
 
-// DELETE FEEDBACK (Admin)
 export async function deleteFeedback(id: number) {
   const list = await getFeedback();
   const updated = list.filter(f => f.id !== id);
@@ -116,7 +109,6 @@ export async function deleteFeedback(id: number) {
   return updated;
 }
 
-// TOGGLE READ STATUS (Admin)
 export async function toggleFeedbackRead(id: number, isRead: boolean) {
   const list = await getFeedback();
   const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
@@ -127,7 +119,7 @@ export async function toggleFeedbackRead(id: number, isRead: boolean) {
 
 
 // ============================================================================
-// 3. USER SYSTEM (AUTH & REGISTRATION)
+// 3. USER SYSTEM
 // ============================================================================
 
 const USERS_DB_PATH = path.join(process.cwd(), "app", "users-db.json");
@@ -136,7 +128,7 @@ export type User = {
   id: number;
   firstName: string;
   lastName: string;
-  alias?: string; // Optional alias
+  alias?: string; 
   dob?: string;
   role: string;
   phone: string;
@@ -144,7 +136,6 @@ export type User = {
   profilePic?: string;
 };
 
-// Response type for Auth actions
 type AuthResponse = {
   success: boolean;
   message?: string;
@@ -160,14 +151,11 @@ export async function getUsers(): Promise<User[]> {
   }
 }
 
-// REGISTER Action
 export async function registerUser(formData: any): Promise<AuthResponse> {
-  // 1. SECURITY CHECK: Verify Door Code
   if (formData.doorCode !== "0129") {
     return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
   }
 
-  // 2. Prepare User Data
   const newUser: User = {
     id: Date.now(),
     firstName: formData.firstName,
@@ -180,7 +168,6 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     joinedAt: new Date().toISOString()
   };
 
-  // 3. Save to DB
   const users = await getUsers();
   const updatedUsers = [...users, newUser];
   await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
@@ -189,21 +176,15 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
   return { success: true, user: newUser };
 }
 
-// LOGIN Action
 export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
-  // 1. Verify Door Code
   if (doorCode !== "0129") {
     return { success: false, message: "❌ Incorrect Door Code." };
   }
-
-  // 2. Find User by Phone
   const users = await getUsers();
   const user = users.find(u => u.phone === phone);
-
   if (!user) {
     return { success: false, message: "User not found. Check phone number or join first." };
   }
-
   return { success: true, user };
 }
 
@@ -214,12 +195,21 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
 
 const POSTS_DB_PATH = path.join(process.cwd(), "app", "posts-db.json");
 
+// --- FIXED: ADDED REPLY TYPE ---
+export type Reply = {
+  id: number;
+  author: string;
+  content: string;
+  timestamp: string;
+};
+
 export type Post = {
   id: number;
   author: string;
   content: string;
   timestamp: string;
-  editCount: number; // Tracks number of edits (Limit: 1)
+  editCount: number; 
+  replies?: Reply[]; // Now 'Reply' is defined above
 };
 
 export async function getPosts(): Promise<Post[]> {
@@ -233,11 +223,11 @@ export async function getPosts(): Promise<Post[]> {
 
 export async function addPost(newPost: Post) {
   const posts = await getPosts();
-  
-  // Enforce initial state
+  // Initialize replies array
   const postWithDefaults = { 
     ...newPost, 
-    editCount: 0 
+    editCount: 0,
+    replies: [] 
   };
   
   const updated = [postWithDefaults, ...posts];
@@ -248,39 +238,20 @@ export async function addPost(newPost: Post) {
 
 export async function editPost(postId: number, newContent: string) {
   const posts = await getPosts();
-  const postIndex = posts.findIndex(p => p.id === postId);
+  const idx = posts.findIndex(p => p.id === postId);
 
-  if (postIndex === -1) {
-    return { success: false, message: "Post not found" };
-  }
+  if (idx === -1) return { success: false, message: "Post not found" };
+  if ((posts[idx].editCount || 0) >= 1) return { success: false, message: "Limit reached" };
+  if ((Date.now() - new Date(posts[idx].timestamp).getTime()) > 15 * 60 * 1000) return { success: false, message: "Time's up" };
 
-  const post = posts[postIndex];
-  
-  // CHECK 1: Edit Count Limit (Max 1)
-  const currentEdits = post.editCount || 0;
-  if (currentEdits >= 1) {
-    return { success: false, message: "🚫 Limit reached! You can only edit a post once." };
-  }
-
-  // CHECK 2: Time Limit (15 mins)
-  const postTime = new Date(post.timestamp).getTime();
-  const now = Date.now();
-  const fifteenMinutes = 15 * 60 * 1000;
-
-  if ((now - postTime) > fifteenMinutes) {
-    return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
-  }
-
-  // Apply Update
-  posts[postIndex].content = newContent;
-  posts[postIndex].editCount = currentEdits + 1; 
+  posts[idx].content = newContent;
+  posts[idx].editCount = (posts[idx].editCount || 0) + 1; 
   
   await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
   revalidatePath("/common-room");
   return { success: true };
 }
 
-// DELETE POST (Admin)
 export async function deletePost(id: number) {
   const posts = await getPosts();
   const updated = posts.filter(p => p.id !== id);
@@ -289,12 +260,38 @@ export async function deletePost(id: number) {
   return updated;
 }
 
+// --- FIXED: ADDED ADD REPLY ACTION ---
+export async function addReply(postId: number, content: string, author: string) {
+  const posts = await getPosts();
+  const postIndex = posts.findIndex(p => p.id === postId);
+
+  if (postIndex === -1) {
+    return { success: false, message: "Post not found" };
+  }
+
+  const newReply: Reply = {
+    id: Date.now(),
+    author,
+    content,
+    timestamp: new Date().toISOString()
+  };
+
+  if (!posts[postIndex].replies) {
+    posts[postIndex].replies = [];
+  }
+
+  posts[postIndex].replies?.push(newReply);
+
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
+  revalidatePath("/common-room");
+  return { success: true, updatedPost: posts[postIndex] };
+}
+
 
 // ============================================================================
 // 5. CHAT SYSTEM (FILE BASED - TEMP DIR)
 // ============================================================================
 
-// Use OS Temp directory for write permissions in production/serverless
 const CHAT_DB_PATH = path.join(os.tmpdir(), "chat-db.json");
 
 export type ChatMessage = {
@@ -309,7 +306,6 @@ export async function getChats(): Promise<ChatMessage[]> {
     const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
     return JSON.parse(data);
   } catch (error) {
-    // If file doesn't exist, return empty array
     return [];
   }
 }
@@ -323,7 +319,6 @@ export async function addChat(text: string, author: string) {
     timestamp: new Date().toISOString()
   };
   
-  // Keep last 100 messages
   const updatedChats = [...chats, newChat].slice(-100); 
   
   try {

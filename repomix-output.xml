@@ -70,6 +70,7 @@ app/
   notifications/
     page.tsx
   actions.ts
+  chat-db.json
   feedback-db.json
   globals.css
   layout.tsx
@@ -99,12 +100,6 @@ tsconfig.json
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="app/chat/page.tsx">
-export default function Chat() {
-  return <div className="p-4 text-center">House Chat</div>;
-}
-</file>
 
 <file path="app/components/AutoLogout.tsx">
 /**
@@ -1035,163 +1030,190 @@ export default function About() {
 }
 </file>
 
-<file path="app/mates/page.tsx">
+<file path="app/chat/page.tsx">
 /**
- * file: app/mates/page.tsx
- * description: Displays housemates with their Birthday (MM/DD) on the card.
+ * file: app/chat/page.tsx
+ * description: Chat page with INTELLIGENT auto-scroll (only scrolls if at bottom).
  */
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { User as UserIcon, Shield, Sparkles, Calendar, Cake } from 'lucide-react';
-import { getUsers, User } from '../actions';
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, Smile, Image as ImageIcon, MessageCircle, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { addChat, getChats, ChatMessage } from '../actions';
 
-export default function Mates() {
-  const [mates, setMates] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+// ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
+const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
+const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
 
+export default function ChatPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageText, setMessageText] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+
+  // 1. Auth Check
   useEffect(() => {
-    const loadMates = async () => {
-      const data = await getUsers();
-      setMates(data);
-      setLoading(false);
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    } else {
+      router.push('/login');
+    }
+  }, [router]);
+
+  // 2. Poll for messages (Smart Update)
+  useEffect(() => {
+    const fetchMessages = async () => {
+      const serverMessages = await getChats();
+      setMessages(current => {
+        if (JSON.stringify(current) !== JSON.stringify(serverMessages)) {
+          return serverMessages;
+        }
+        return current;
+      });
     };
-    loadMates();
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 2000);
+    return () => clearInterval(interval);
   }, []);
 
-  const formatJoinedDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString('en-US', { 
-      month: 'short', 
-      year: 'numeric' 
-    });
+  // 3. Scroll Logic
+  // Check if user is scrolling up manually
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    // Consider "near bottom" if within 100px of bottom
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setIsNearBottom(distanceFromBottom < 100);
   };
 
-  // Helper to turn "YYYY-MM-DD" into "MM/DD"
-  const formatBirthday = (dobString?: string) => {
-    if (!dobString) return "N/A";
-    // Split string to avoid timezone issues with Date() parsing
-    const parts = dobString.split('-'); // [YYYY, MM, DD]
-    if (parts.length === 3) {
-      return `${parts[1]}/${parts[2]}`; // MM/DD
+  // Auto-scroll ONLY if user was already near bottom
+  useEffect(() => {
+    if (isNearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-    return dobString;
+  }, [messages, isNearBottom]);
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !currentUser) return;
+    const textToSend = messageText.trim();
+    setMessageText("");
+    setShowEmojiPicker(false);
+    setShowGifPicker(false);
+
+    const authorName = currentUser.alias || currentUser.firstName;
+    
+    // Optimistic Update
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
+    
+    // Force scroll to bottom when I send a message
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
+    await addChat(textToSend, authorName);
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSendMessage(); };
+  const handleEmojiClick = (emoji: string) => { setMessageText(prev => prev + emoji); };
+  
+  const handleGifClick = async (label: string) => { 
+    if (!currentUser) return; 
+    const authorName = currentUser.alias || currentUser.firstName; 
+    const gifText = `[GIF: ${label}]`; 
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    setShowGifPicker(false); 
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    await addChat(gifText, authorName); 
+  };
+
+  const getInitial = (name: string) => name ? name.charAt(0).toUpperCase() : "?";
 
   return (
-    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '0.5rem' }}>
-            House Mates
-          </h1>
-          <p style={{ color: 'gray' }}>Meet the neighbors.</p>
+    <main style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc', paddingBottom: '0' }}>
+      
+      {/* HEADER */}
+      <div style={{ padding: '1rem', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', zIndex: 10 }}>
+        <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}><ArrowLeft size={24} color="#64748b" /></button>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#1e293b' }}>House Chat</h1>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>Live • {messages.length} messages</p>
         </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-            Loading directory...
-          </div>
-        )}
-
-        {/* Mates Grid */}
-        <div className="animate-fade-in" style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-          gap: '1.5rem' 
-        }}>
-          {mates.map((mate) => (
-            <div key={mate.id} style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '24px', 
-              padding: '2rem', 
-              boxShadow: '0 10px 30px rgba(0,0,0,0.05)', 
-              border: '1px solid #f1f5f9',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              transition: 'transform 0.2s',
-              cursor: 'default'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-            >
-              
-              {/* Avatar Circle */}
-              <div style={{ 
-                width: '80px', height: '80px', 
-                backgroundColor: '#e0f2fe', 
-                borderRadius: '50%', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: '1rem',
-                color: '#0284c7'
-              }}>
-                <UserIcon size={40} />
-              </div>
-
-              {/* Name & Alias */}
-              <h3 style={{ margin: '0 0 5px 0', fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>
-                {mate.firstName} {mate.lastName}
-              </h3>
-              
-              {mate.alias && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--sandy-brown)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  <Sparkles size={14} /> {mate.alias}
-                </div>
-              )}
-
-              {/* Divider */}
-              <div style={{ width: '100%', height: '1px', backgroundColor: '#e2e8f0', margin: '1rem 0' }} />
-
-              {/* Details */}
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
-                    <Shield size={16} /> Role
-                  </div>
-                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{mate.role}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
-                    <Calendar size={16} /> Joined
-                  </div>
-                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{formatJoinedDate(mate.joinedAt)}</span>
-                </div>
-
-                {/* BIRTHDAY DISPLAY */}
-                {mate.dob && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
-                      <Cake size={16} /> Birthday
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>
-                      {formatBirthday(mate.dob)}
-                    </span>
-                  </div>
-                )}
-
-              </div>
-
-            </div>
-          ))}
-        </div>
-
-        {!loading && mates.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-            No housemates found. Strange... is the house empty? 👻
-          </div>
-        )}
-
+        <div style={{ padding: '10px', backgroundColor: '#e0f2fe', borderRadius: '50%' }}><MessageCircle size={24} color="#0284c7" /></div>
       </div>
+
+      {/* MESSAGES AREA */}
+      <div 
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+        style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
+      >
+        {messages.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+            <MessageCircle size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p>Quiet in here... say something!</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
+            return (
+              <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '70%', display: 'flex', gap: '10px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: isMe ? '#e0f2fe' : '#ffffff', color: isMe ? '#0284c7' : '#64748b', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 'bold', flexShrink: 0 }}>{getInitial(msg.author)}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                  {!isMe && <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px' }}>{msg.author}</span>}
+                  <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '12px 16px', borderRadius: '20px', borderTopRightRadius: isMe ? '4px' : '20px', borderTopLeftRadius: isMe ? '20px' : '4px', fontSize: '1rem', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', lineHeight: '1.5', wordWrap: 'break-word' }}>{msg.text}</div>
+                  <span style={{ fontSize: '0.7rem', color: '#cbd5e1', marginTop: '4px', margin: '0 4px' }}>{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* INPUT AREA (Unchanged) */}
+      <div style={{ padding: '1rem', backgroundColor: 'white', borderTop: '1px solid #e2e8f0', zIndex: 10 }}>
+        {showEmojiPicker && <div style={{ marginBottom: '10px', height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderRadius: '12px', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.5rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
+        {showGifPicker && <div style={{ marginBottom: '10px', height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderRadius: '12px', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)' }}>{gif.label}</button>)}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '28px', border: '1px solid #e2e8f0', padding: '6px 6px 6px 16px', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+          <input type="text" placeholder="Type a message..." value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={handleKeyDown} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: 'none', outline: 'none', fontSize: '1rem', color: '#1e293b' }} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showEmojiPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '8px' }}><Smile size={24} /></button>
+            <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '8px' }}><ImageIcon size={24} /></button>
+            <button onClick={handleSendMessage} style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'var(--sandy-brown)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}><Send size={20} /></button>
+          </div>
+        </div>
+      </div>
+
     </main>
   );
 }
+</file>
+
+<file path="app/chat-db.json">
+[
+  {
+    "id": 1768062007641,
+    "author": "idongcodes",
+    "text": "Test msg .",
+    "timestamp": "2026-01-10T16:20:07.641Z"
+  },
+  {
+    "id": 1768062922514,
+    "author": "idongcodes",
+    "text": "👀",
+    "timestamp": "2026-01-10T16:35:22.514Z"
+  }
+]
 </file>
 
 <file path="app/posts-db.json">
@@ -1420,262 +1442,115 @@ export default function FeedbackPage() {
 }
 </file>
 
-<file path="app/join/page.tsx">
+<file path="app/mates/page.tsx">
 /**
- * file: app/join/page.tsx
- * description: Added Date of Birth field to registration form.
+ * file: app/mates/page.tsx
+ * description: Displays housemates with profile pictures.
  */
 
 "use client";
 
-import React, { useState } from 'react';
-import { User, Phone, Key, ShieldCheck, ChevronRight, AlertCircle, Loader2, Sparkles, Calendar } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { registerUser } from '../actions';
+import React, { useEffect, useState } from 'react';
+import { User as UserIcon, Shield, Sparkles, Calendar, Cake } from 'lucide-react';
+import { getUsers, User } from '../actions';
 
-export default function Join() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    alias: "",
-    dob: "", // <--- NEW STATE
-    role: "Tenant",
-    phone: "",
-    doorCode: ""
-  });
-  
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
-  const [errorMessage, setErrorMessage] = useState("");
+export default function Mates() {
+  const [mates, setMates] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (status === 'error') {
-      setStatus('idle');
-      setErrorMessage("");
-    }
+  useEffect(() => {
+    const loadMates = async () => {
+      const data = await getUsers();
+      setMates(data);
+      setLoading(false);
+    };
+    loadMates();
+  }, []);
+
+  const formatJoinedDate = (isoString: string) => {
+    return new Date(isoString).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('loading');
-
-    const result = await registerUser(formData);
-
-    if (result.success && result.user) {
-      sessionStorage.setItem('212user', JSON.stringify(result.user));
-      
-      setStatus('success');
-      setTimeout(() => {
-        router.push('/common-room'); 
-      }, 1500);
-    } else {
-      setStatus('error');
-      setErrorMessage(result.message || "Something went wrong");
-    }
+  const formatBirthday = (dobString?: string) => {
+    if (!dobString) return "N/A";
+    const parts = dobString.split('-'); 
+    if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+    return dobString;
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
-      
-      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ 
-            width: '80px', height: '80px', margin: '0 auto 1rem auto', 
-            backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', 
-            borderRadius: '50%', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)',
-            transition: 'background-color 0.5s'
-          }}>
-            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
-          </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
-          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '0.5rem' }}>House Mates</h1>
+          <p style={{ color: 'gray' }}>Meet the neighbors.</p>
         </div>
 
-        {/* Form Card */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          padding: '2rem', 
-          borderRadius: '24px', 
-          boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
-          border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0',
-          transition: 'border-color 0.3s'
-        }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
-            {/* Name Fields Row */}
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input 
-                    type="text" 
-                    name="firstName" 
-                    placeholder="Jane"
-                    required
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-                  />
-                </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
-                <input 
-                  type="text" 
-                  name="lastName" 
-                  placeholder="Doe"
-                  required
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-                />
-              </div>
-            </div>
+        {loading && <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>Loading directory...</div>}
 
-            {/* Alias Field */}
-            <div>
-               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                 <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
-               </label>
-               <div style={{ position: 'relative' }}>
-                  <Sparkles size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input 
-                    type="text" 
-                    name="alias" 
-                    placeholder="e.g. 'The Chef'"
-                    value={formData.alias}
-                    onChange={handleChange}
-                    style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-                  />
-               </div>
-            </div>
-
-            {/* Date of Birth Field */}
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Date of Birth</label>
-              <div style={{ position: 'relative' }}>
-                <Calendar size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input 
-                  type="date" 
-                  name="dob" 
-                  required
-                  value={formData.dob}
-                  onChange={handleChange}
-                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', color: '#1e293b' }} 
-                />
-              </div>
-            </div>
-
-            {/* Role Selection */}
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
-              <div style={{ position: 'relative' }}>
-                <select 
-                  name="role" 
-                  value={formData.role} 
-                  onChange={handleChange}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', backgroundColor: 'white', appearance: 'none' }}
-                >
-                  <option value="Tenant">Tenant</option>
-                  <option value="Landlord">Landlord</option>
-                  <option value="First Lady">First Lady</option>
-                </select>
-                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                  <ChevronRight size={16} color="#94a3b8" style={{ transform: 'rotate(90deg)' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Phone Number */}
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
-              <div style={{ position: 'relative' }}>
-                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input 
-                  type="tel" 
-                  name="phone" 
-                  placeholder="(508) 555-0123"
-                  required
-                  value={formData.phone}
-                  onChange={handleChange}
-                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-                />
-              </div>
-            </div>
-
-            {/* Door Code */}
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
-              <div style={{ position: 'relative' }}>
-                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input 
-                  type="password" 
-                  name="doorCode" 
-                  placeholder="Enter the 4-digit code"
-                  required
-                  value={formData.doorCode}
-                  onChange={handleChange}
-                  maxLength={4}
-                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} 
-                />
-              </div>
-              
-              {status === 'error' && (
-                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                  <AlertCircle size={16} />
-                  {errorMessage}
-                </div>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <button 
-              type="submit" 
-              disabled={status === 'loading' || status === 'success'}
-              style={{ 
-                marginTop: '1rem',
-                backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sky-blue)', 
-                color: status === 'success' ? '#171717' : 'white', 
-                border: 'none', 
-                padding: '16px', 
-                borderRadius: '12px', 
-                fontSize: '1.1rem', 
-                fontWeight: 'bold', 
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 4px 12px rgba(135, 206, 235, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px'
-              }}
+        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          {mates.map((mate) => (
+            <div key={mate.id} style={{ 
+              backgroundColor: 'white', borderRadius: '24px', padding: '2rem', 
+              boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+              transition: 'transform 0.2s', cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              {status === 'loading' ? (
-                <>Unlocking <Loader2 className="animate-spin" size={20}/></>
-              ) : status === 'success' ? (
-                "Success! Redirecting..."
-              ) : (
-                "Unlock & Join"
+              
+              {/* Avatar Circle */}
+              <div style={{ 
+                width: '100px', height: '100px', 
+                borderRadius: '50%', overflow: 'hidden',
+                backgroundColor: '#e0f2fe', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: '1rem', color: '#0284c7',
+                border: '3px solid white', boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
+              }}>
+                {mate.profilePic ? (
+                  <img src={mate.profilePic} alt={mate.firstName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <UserIcon size={48} />
+                )}
+              </div>
+
+              <h3 style={{ margin: '0 0 5px 0', fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>
+                {mate.firstName} {mate.lastName}
+              </h3>
+              
+              {mate.alias && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--sandy-brown)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  <Sparkles size={14} /> {mate.alias}
+                </div>
               )}
-            </button>
-          </form>
 
-          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-            <Link href="/" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>
-              ← Back to Home
-            </Link>
-          </div>
+              <div style={{ width: '100%', height: '1px', backgroundColor: '#e2e8f0', margin: '1rem 0' }} />
 
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}><Shield size={16} /> Role</div>
+                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{mate.role}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}><Calendar size={16} /> Joined</div>
+                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{formatJoinedDate(mate.joinedAt)}</span>
+                </div>
+                {mate.dob && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}><Cake size={16} /> Birthday</div>
+                    <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{formatBirthday(mate.dob)}</span>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          ))}
         </div>
+
+        {!loading && mates.length === 0 && <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No housemates found. Strange... is the house empty? 👻</div>}
       </div>
     </main>
   );
@@ -1914,140 +1789,6 @@ export default function Footer() {
 }
 </file>
 
-<file path="app/components/Navigation.tsx">
-/**
- * file: app/components/Navigation.tsx
- * description: Restricts navigation items for guests (Home & Login only).
- */
-
-"use client";
-
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn } from "lucide-react";
-import { useEffect, useState } from "react";
-
-export default function Navigation() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    // Check login status on mount and path change
-    const checkLogin = () => {
-      const user = sessionStorage.getItem('212user');
-      setIsLoggedIn(!!user);
-    };
-    checkLogin();
-  }, [pathname]);
-
-  const handleLogout = () => {
-    sessionStorage.removeItem('212user');
-    setIsLoggedIn(false);
-    router.push('/');
-  };
-
-  const isActive = (path: string) => pathname === path;
-
-  const getLinkStyle = (path: string) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af',
-    fontWeight: isActive(path) ? 'bold' : 'normal',
-    transition: 'color 0.2s ease',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 0
-  });
-
-  return (
-    <>
-      <nav 
-        style={{
-          position: 'fixed',
-          bottom: '1.5rem',
-          left: '50%',
-          transform: 'translateX(-50%)', // Center the nav
-          zIndex: 100,
-          display: 'flex',
-          gap: '20px',
-          alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          borderRadius: '50px',
-          padding: '12px 25px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-        }}
-      >
-        {/* ALWAYS VISIBLE: Home */}
-        <Link href="/" style={getLinkStyle("/")} title="Home"><Home size={24} /></Link>
-        
-        {/* AUTHENTICATED ONLY LINKS */}
-        {isLoggedIn && (
-          <>
-            <Link href="/common-room" style={getLinkStyle("/common-room")} title="Common Room"><Armchair size={24} /></Link>
-            <Link href="/my-room" style={getLinkStyle("/my-room")} title="My Room"><Bed size={24} /></Link>
-            <Link href="/mates" style={getLinkStyle("/mates")} title="Mates"><Users size={24} /></Link>
-            <Link href="/notifications" style={getLinkStyle("/notifications")} title="Notifications"><Bell size={24} /></Link>
-            <Link href="/about" style={getLinkStyle("/about")} title="About"><Info size={24} /></Link>
-          </>
-        )}
-
-        {/* SEPARATOR (Only if logged in to separate logout) */}
-        <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
-
-        {/* LOGIN / LOGOUT TOGGLE */}
-        {isLoggedIn ? (
-          <button 
-            onClick={handleLogout} 
-            style={getLinkStyle("logout")} 
-            title="Log Out"
-          >
-            <LogOut size={24} color="#ef4444" />
-          </button>
-        ) : (
-          <Link 
-            href="/login" 
-            style={getLinkStyle("/login")}
-            title="Log In"
-          >
-            <LogIn size={24} color="var(--sky-blue)" />
-          </Link>
-        )}
-      </nav>
-
-      {/* CHAT BUTTON - Only show if Logged In */}
-      {isLoggedIn && (
-        <Link
-          href="/chat"
-          style={{
-            position: 'fixed',
-            bottom: '6rem', // Moved up slightly to avoid overlap
-            right: '1rem',
-            zIndex: 100,
-            height: '56px',
-            width: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'var(--light-green)',
-            color: isActive("/chat") ? 'white' : '#171717',
-            borderRadius: '50%',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-            border: isActive("/chat") ? '2px solid white' : 'none'
-          }}
-        >
-          <MessageCircle size={28} />
-        </Link>
-      )}
-    </>
-  );
-}
-</file>
-
 <file path="app/praise-db.json">
 [
   {
@@ -2088,6 +1829,219 @@ export default function Navigation() {
     "tailwindcss": "^4",
     "typescript": "^5"
   }
+}
+</file>
+
+<file path="app/join/page.tsx">
+/**
+ * file: app/join/page.tsx
+ * description: Reverted heading texts to original. Profile pic input remains.
+ */
+
+"use client";
+
+import React, { useState, useRef } from 'react';
+import { User, Phone, Key, ShieldCheck, ChevronRight, AlertCircle, Loader2, Sparkles, Calendar, Camera } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { registerUser } from '../actions';
+
+export default function Join() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    alias: "",
+    dob: "",
+    role: "Tenant",
+    phone: "",
+    doorCode: "",
+    profilePic: ""
+  });
+  
+  const [fileName, setFileName] = useState("");
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (status === 'error') {
+      setStatus('idle');
+      setErrorMessage("");
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, profilePic: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+
+    const result = await registerUser(formData);
+
+    if (result.success && result.user) {
+      sessionStorage.setItem('212user', JSON.stringify(result.user));
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/common-room'); 
+      }, 1500);
+    } else {
+      setStatus('error');
+      setErrorMessage(result.message || "Something went wrong");
+    }
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
+      
+      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+        
+        {/* HEADER: Reverted Texts */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ 
+            width: '80px', height: '80px', margin: '0 auto 1rem auto', 
+            backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', 
+            borderRadius: '50%', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)',
+            transition: 'background-color 0.5s'
+          }}>
+            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
+          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
+        </div>
+
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '2rem', 
+          borderRadius: '24px', 
+          boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
+          border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0',
+          transition: 'border-color 0.3s'
+        }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Name Fields */}
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
+                <div style={{ position: 'relative' }}>
+                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
+                <input type="text" name="lastName" placeholder="Doe" required value={formData.lastName} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+              </div>
+            </div>
+
+            {/* Profile Picture */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Profile Picture</label>
+              <div style={{ position: 'relative' }}>
+                <Camera size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  readOnly 
+                  placeholder={fileName || "Tap to upload photo"} 
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', cursor: 'pointer', backgroundColor: 'white', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }} 
+                />
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                />
+              </div>
+            </div>
+
+            {/* Alias */}
+            <div>
+               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
+                 <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
+               </label>
+               <div style={{ position: 'relative' }}>
+                  <Sparkles size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input type="text" name="alias" placeholder="e.g. 'The Chef'" value={formData.alias} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+               </div>
+            </div>
+
+            {/* DOB */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Date of Birth</label>
+              <div style={{ position: 'relative' }}>
+                <Calendar size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input type="date" name="dob" required value={formData.dob} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', color: '#1e293b' }} />
+              </div>
+            </div>
+
+            {/* Role */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
+              <div style={{ position: 'relative' }}>
+                <select name="role" value={formData.role} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', backgroundColor: 'white', appearance: 'none' }}>
+                  <option value="Tenant">Tenant</option>
+                  <option value="Landlord">Landlord</option>
+                  <option value="First Lady">First Lady</option>
+                </select>
+                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><ChevronRight size={16} color="#94a3b8" style={{ transform: 'rotate(90deg)' }} /></div>
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
+              <div style={{ position: 'relative' }}>
+                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="tel" name="phone" placeholder="(508) 555-0123" required value={formData.phone} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+              </div>
+            </div>
+
+            {/* Door Code */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
+              <div style={{ position: 'relative' }}>
+                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="password" name="doorCode" placeholder="Enter the 4-digit code" required value={formData.doorCode} onChange={handleChange} maxLength={4} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} />
+              </div>
+              
+              {status === 'error' && (
+                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <AlertCircle size={16} />
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+
+            <button type="submit" disabled={status === 'loading' || status === 'success'} style={{ marginTop: '1rem', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sky-blue)', color: status === 'success' ? '#171717' : 'white', border: 'none', padding: '16px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(135, 206, 235, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              {status === 'loading' ? <>Unlocking <Loader2 className="animate-spin" size={20}/></> : status === 'success' ? "Success! Redirecting..." : "Unlock & Join"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <Link href="/" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>← Back to Home</Link>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }
 </file>
 
@@ -2289,295 +2243,6 @@ export default function CommonRoom() {
       </div>
     </main>
   );
-}
-</file>
-
-<file path="app/actions.ts">
-/**
- * file: app/actions.ts
- * description: Server actions for Praise, Feedback, Users (Auth), and Common Room Posts.
- */
-
-"use server";
-
-import fs from "fs/promises";
-import path from "path";
-import { revalidatePath } from "next/cache";
-
-// ============================================================================
-// 1. PRAISE SYSTEM
-// ============================================================================
-
-const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
-
-export type Praise = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-  submittedAt?: string;
-};
-
-const PRAISE_SEED_DATA: Praise[] = [
-  { 
-    id: 1, 
-    name: "Idong", 
-    role: "Tenant", 
-    subject: "🚀 🥂", 
-    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽" 
-  }
-];
-
-export async function getPraises(): Promise<Praise[]> {
-  try {
-    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    // If file doesn't exist, create it with seed data
-    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
-    return PRAISE_SEED_DATA;
-  }
-}
-
-export async function addPraise(newPraise: Praise) {
-  const praises = await getPraises();
-
-  // Ensure timestamp is present
-  const praiseWithDate = {
-    ...newPraise,
-    submittedAt: newPraise.submittedAt || new Date().toISOString()
-  };
-
-  const updatedPraises = [newPraise, ...praises];
-  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
-  revalidatePath("/"); // Refresh Home page
-  return updatedPraises;
-}
-
-// DELETE PRAISE (Admin)
-export async function deletePraise(id: number) {
-  const praises = await getPraises();
-  const updated = praises.filter(p => p.id !== id);
-  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/");
-  return updated;
-}
-
-
-// ============================================================================
-// 2. FEEDBACK SYSTEM
-// ============================================================================
-
-const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
-
-export type Feedback = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-  submittedAt: string;
-  read?: boolean; // Track read status
-};
-
-export async function getFeedback(): Promise<Feedback[]> {
-  try {
-    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-}
-
-export async function addFeedback(newFeedback: Feedback) {
-  const list = await getFeedback();
-  // Ensure new feedback starts as unread
-  const feedbackWithStatus = { ...newFeedback, read: false };
-  const updated = [feedbackWithStatus, ...list];
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/feedback");
-  return updated;
-}
-
-// DELETE FEEDBACK (Admin)
-export async function deleteFeedback(id: number) {
-  const list = await getFeedback();
-  const updated = list.filter(f => f.id !== id);
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/feedback");
-  return updated;
-}
-
-// TOGGLE READ STATUS (Admin)
-export async function toggleFeedbackRead(id: number, isRead: boolean) {
-  const list = await getFeedback();
-  const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/feedback");
-  return updated;
-}
-
-
-// ============================================================================
-// 3. USER SYSTEM (AUTH & REGISTRATION)
-// ============================================================================
-
-const USERS_DB_PATH = path.join(process.cwd(), "app", "users-db.json");
-
-export type User = {
-  id: number;
-  firstName: string;
-  lastName: string;
-  alias?: string; // Optional alias
-  dob?: string;
-  role: string;
-  phone: string;
-  joinedAt: string;
-};
-
-// Response type for Auth actions
-type AuthResponse = {
-  success: boolean;
-  message?: string;
-  user?: User;
-};
-
-export async function getUsers(): Promise<User[]> {
-  try {
-    const data = await fs.readFile(USERS_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-}
-
-// REGISTER Action
-export async function registerUser(formData: any): Promise<AuthResponse> {
-  // 1. SECURITY CHECK: Verify Door Code
-  if (formData.doorCode !== "0129") {
-    return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
-  }
-
-  // 2. Prepare User Data
-  const newUser: User = {
-    id: Date.now(),
-    firstName: formData.firstName,
-    lastName: formData.lastName,
-    alias: formData.alias || "",
-    dob: formData.dob, 
-    role: formData.role,
-    phone: formData.phone,
-    joinedAt: new Date().toISOString()
-  };
-
-  // 3. Save to DB
-  const users = await getUsers();
-  const updatedUsers = [...users, newUser];
-  await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
-  
-  revalidatePath("/mates");
-  return { success: true, user: newUser };
-}
-
-// LOGIN Action
-export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
-  // 1. Verify Door Code
-  if (doorCode !== "0129") {
-    return { success: false, message: "❌ Incorrect Door Code." };
-  }
-
-  // 2. Find User by Phone
-  const users = await getUsers();
-  const user = users.find(u => u.phone === phone);
-
-  if (!user) {
-    return { success: false, message: "User not found. Check phone number or join first." };
-  }
-
-  return { success: true, user };
-}
-
-
-// ============================================================================
-// 4. COMMON ROOM POSTS SYSTEM
-// ============================================================================
-
-const POSTS_DB_PATH = path.join(process.cwd(), "app", "posts-db.json");
-
-export type Post = {
-  id: number;
-  author: string;
-  content: string;
-  timestamp: string;
-  editCount: number; // Tracks number of edits (Limit: 1)
-};
-
-export async function getPosts(): Promise<Post[]> {
-  try {
-    const data = await fs.readFile(POSTS_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-}
-
-export async function addPost(newPost: Post) {
-  const posts = await getPosts();
-  
-  // Enforce initial state
-  const postWithDefaults = { 
-    ...newPost, 
-    editCount: 0 
-  };
-  
-  const updated = [postWithDefaults, ...posts];
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/common-room");
-  return updated;
-}
-
-export async function editPost(postId: number, newContent: string) {
-  const posts = await getPosts();
-  const postIndex = posts.findIndex(p => p.id === postId);
-
-  if (postIndex === -1) {
-    return { success: false, message: "Post not found" };
-  }
-
-  const post = posts[postIndex];
-  
-  // CHECK 1: Edit Count Limit (Max 1)
-  const currentEdits = post.editCount || 0;
-  if (currentEdits >= 1) {
-    return { success: false, message: "🚫 Limit reached! You can only edit a post once." };
-  }
-
-  // CHECK 2: Time Limit (15 mins)
-  const postTime = new Date(post.timestamp).getTime();
-  const now = Date.now();
-  const fifteenMinutes = 15 * 60 * 1000;
-
-  if ((now - postTime) > fifteenMinutes) {
-    return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
-  }
-
-  // Apply Update
-  posts[postIndex].content = newContent;
-  posts[postIndex].editCount = currentEdits + 1; 
-  
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
-  revalidatePath("/common-room");
-  return { success: true };
-}
-
-// DELETE POST (Admin)
-export async function deletePost(id: number) {
-  const posts = await getPosts();
-  const updated = posts.filter(p => p.id !== id);
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/common-room");
-  return updated;
 }
 </file>
 
@@ -2990,6 +2655,601 @@ export default function Home() {
 
     </main>
   );
+}
+</file>
+
+<file path="app/components/Navigation.tsx">
+/**
+ * file: app/components/Navigation.tsx
+ * description: Chat Popup now displays real profile pictures from registered users.
+ */
+
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { addChat, getChats, ChatMessage, getUsers, User } from "../actions"; // Import getUsers
+
+// ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
+const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
+const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
+
+export default function Navigation() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  const isChatPage = pathname === "/chat"; 
+  const prevPathRef = useRef(pathname);
+
+  // Chat State
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageText, setMessageText] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "Base64Pic"
+  
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+
+  // 1. Auth & Login Check
+  useEffect(() => {
+    const checkLogin = () => {
+      const storedUser = sessionStorage.getItem('212user');
+      if (storedUser) {
+        setIsLoggedIn(true);
+        setCurrentUser(JSON.parse(storedUser));
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
+    checkLogin();
+  }, [pathname]);
+
+  // 2. Fetch User Avatars
+  useEffect(() => {
+    if (isLoggedIn) {
+      getUsers().then(users => {
+        const map: Record<string, string> = {};
+        users.forEach(u => {
+          // Map both real name and alias to the profile pic
+          if (u.profilePic) {
+            map[u.firstName] = u.profilePic;
+            if (u.alias) map[u.alias] = u.profilePic;
+          }
+        });
+        setUserMap(map);
+      });
+    }
+  }, [isLoggedIn]);
+
+  // 3. Auto-Open Chat logic
+  useEffect(() => {
+    if (prevPathRef.current === "/chat" && pathname !== "/chat") {
+      setIsChatOpen(true);
+    }
+    prevPathRef.current = pathname;
+  }, [pathname]);
+
+  // 4. Polling
+  useEffect(() => {
+    if (!isChatOpen) return;
+    const fetchMessages = async () => { 
+      const serverMessages = await getChats(); 
+      setMessages(current => {
+        if (JSON.stringify(current) !== JSON.stringify(serverMessages)) {
+          return serverMessages;
+        }
+        return current;
+      });
+    };
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 2000);
+    return () => clearInterval(interval);
+  }, [isChatOpen]);
+
+  // 5. Scroll Logic
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setIsNearBottom(distanceFromBottom < 100);
+  };
+
+  useEffect(() => { 
+    if (isNearBottom && isChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isChatOpen, isNearBottom]);
+
+  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !currentUser) return;
+    const textToSend = messageText.trim();
+    setMessageText(""); setShowEmojiPicker(false); setShowGifPicker(false);
+    
+    const authorName = currentUser.alias || currentUser.firstName;
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
+    
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
+    await addChat(textToSend, authorName);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSendMessage(); };
+  const handleEmojiClick = (emoji: string) => { setMessageText(prev => prev + emoji); };
+  
+  const handleGifClick = async (label: string) => { 
+    if (!currentUser) return; 
+    const authorName = currentUser.alias || currentUser.firstName; 
+    const gifText = `[GIF: ${label}]`; 
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    setShowGifPicker(false); 
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    await addChat(gifText, authorName); 
+  };
+
+  const isActive = (path: string) => pathname === path;
+  const getLinkStyle = (path: string) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af', fontWeight: isActive(path) ? 'bold' : 'normal', transition: 'color 0.2s ease', background: 'none', border: 'none', cursor: 'pointer', padding: 0 });
+  const getInitial = (name: string) => name ? name.charAt(0).toUpperCase() : "?";
+
+  return (
+    <>
+      <nav style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 100, display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50px', padding: '12px 25px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
+        <Link href="/" style={getLinkStyle("/")} title="Home"><Home size={24} /></Link>
+        {isLoggedIn && (
+          <>
+            <Link href="/common-room" style={getLinkStyle("/common-room")} title="Common Room"><Armchair size={24} /></Link>
+            <Link href="/my-room" style={getLinkStyle("/my-room")} title="My Room"><Bed size={24} /></Link>
+            <Link href="/mates" style={getLinkStyle("/mates")} title="Mates"><Users size={24} /></Link>
+            <Link href="/notifications" style={getLinkStyle("/notifications")} title="Notifications"><Bell size={24} /></Link>
+            <Link href="/about" style={getLinkStyle("/about")} title="About"><Info size={24} /></Link>
+          </>
+        )}
+        <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
+        {isLoggedIn ? (
+          <button onClick={handleLogout} style={getLinkStyle("logout")} title="Log Out"><LogOut size={24} color="#ef4444" /></button>
+        ) : (
+          <Link href="/login" style={getLinkStyle("/login")} title="Log In"><LogIn size={24} color="var(--sky-blue)" /></Link>
+        )}
+      </nav>
+
+      {/* CHAT POPUP */}
+      {isLoggedIn && !isChatPage && (
+        <>
+          {isChatOpen && (
+            <div className="animate-fade-in" style={{ position: 'fixed', bottom: '8rem', right: '1rem', width: '320px', height: '450px', backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', zIndex: 101, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+              
+              {/* TOP BAR */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: 'var(--sky-blue)', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageCircle size={18} fill="rgba(255,255,255,0.2)" />
+                  <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>House Chat</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <button onClick={() => setIsChatOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white', padding: 0 }}><Minus size={20} /></button>
+                  <button onClick={() => router.push('/chat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white', padding: 0 }}><Maximize2 size={18} /></button>
+                </div>
+              </div>
+
+              {/* MESSAGES AREA */}
+              <div 
+                ref={chatContainerRef}
+                onScroll={handleScroll}
+                style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}
+              >
+                {messages.length === 0 ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                    <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '1rem' }}><MessageCircle size={32} color="var(--sandy-brown)" /></div>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>No messages yet.</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
+                    const avatarSrc = userMap[msg.author];
+
+                    return (
+                      <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
+                        
+                        {/* AVATAR */}
+                        <div style={{ 
+                          width: '28px', height: '28px', borderRadius: '50%', 
+                          backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', 
+                          color: isMe ? '#0284c7' : '#64748b',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.75rem', fontWeight: 'bold',
+                          flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)',
+                          overflow: 'hidden' 
+                        }}>
+                          {avatarSrc ? (
+                            <img src={avatarSrc} alt={msg.author} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            getInitial(msg.author)
+                          )}
+                        </div>
+
+                        {/* MESSAGE */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                          {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px' }}>{msg.author}</div>}
+                          <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* INPUT AREA (Same as before) */}
+              {showEmojiPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
+              {showGifPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}</div>}
+              <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>
+                <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '4px', paddingLeft: '12px' }}>
+                  <input type="text" placeholder="Type a message..." value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={handleKeyDown} style={{ flex: 1, padding: '8px 0', background: 'transparent', border: 'none', outline: 'none', fontSize: '0.9rem', color: '#1e293b', minWidth: 0 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showEmojiPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}><Smile size={20} /></button>
+                    <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}><ImageIcon size={20} /></button>
+                    <button onClick={handleSendMessage} style={{ background: 'var(--sandy-brown)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', marginLeft: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }}><Send size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button onClick={() => setIsChatOpen(!isChatOpen)} style={{ position: 'fixed', bottom: '6rem', right: '1rem', zIndex: 100, height: '56px', width: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isChatOpen ? '#ef4444' : 'var(--light-green)', color: 'white', borderRadius: '50%', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: '2px solid white', cursor: 'pointer', transition: 'all 0.2s ease' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+            {isChatOpen ? <X size={28} /> : <MessageCircle size={28} />}
+          </button>
+        </>
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="app/actions.ts">
+/**
+ * file: app/actions.ts
+ * description: Fixed missing 'os' import.
+ */
+
+"use server";
+
+import fs from "fs/promises";
+import path from "path";
+import os from "os"; // <--- ADDED THIS IMPORT
+import { revalidatePath } from "next/cache";
+
+// ============================================================================
+// 1. PRAISE SYSTEM
+// ============================================================================
+
+const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
+
+export type Praise = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+  submittedAt?: string;
+};
+
+const PRAISE_SEED_DATA: Praise[] = [
+  { 
+    id: 1, 
+    name: "Idong", 
+    role: "Tenant", 
+    subject: "🚀 🥂", 
+    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽",
+    submittedAt: new Date().toISOString()
+  }
+];
+
+export async function getPraises(): Promise<Praise[]> {
+  try {
+    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, create it with seed data
+    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
+    return PRAISE_SEED_DATA;
+  }
+}
+
+export async function addPraise(newPraise: Praise) {
+  const praises = await getPraises();
+  
+  // Ensure timestamp is present
+  const praiseWithDate = {
+    ...newPraise,
+    submittedAt: newPraise.submittedAt || new Date().toISOString()
+  };
+
+  const updatedPraises = [praiseWithDate, ...praises];
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
+  revalidatePath("/"); // Refresh Home page
+  return updatedPraises;
+}
+
+// DELETE PRAISE (Admin)
+export async function deletePraise(id: number) {
+  const praises = await getPraises();
+  const updated = praises.filter(p => p.id !== id);
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/");
+  return updated;
+}
+
+
+// ============================================================================
+// 2. FEEDBACK SYSTEM
+// ============================================================================
+
+const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
+
+export type Feedback = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+  submittedAt: string;
+  read?: boolean; // Track read status
+};
+
+export async function getFeedback(): Promise<Feedback[]> {
+  try {
+    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function addFeedback(newFeedback: Feedback) {
+  const list = await getFeedback();
+  // Ensure new feedback starts as unread
+  const feedbackWithStatus = { ...newFeedback, read: false };
+  const updated = [feedbackWithStatus, ...list];
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// DELETE FEEDBACK (Admin)
+export async function deleteFeedback(id: number) {
+  const list = await getFeedback();
+  const updated = list.filter(f => f.id !== id);
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// TOGGLE READ STATUS (Admin)
+export async function toggleFeedbackRead(id: number, isRead: boolean) {
+  const list = await getFeedback();
+  const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+
+// ============================================================================
+// 3. USER SYSTEM (AUTH & REGISTRATION)
+// ============================================================================
+
+const USERS_DB_PATH = path.join(process.cwd(), "app", "users-db.json");
+
+export type User = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  alias?: string; // Optional alias
+  dob?: string;
+  role: string;
+  phone: string;
+  joinedAt: string;
+  profilePic?: string;
+};
+
+// Response type for Auth actions
+type AuthResponse = {
+  success: boolean;
+  message?: string;
+  user?: User;
+};
+
+export async function getUsers(): Promise<User[]> {
+  try {
+    const data = await fs.readFile(USERS_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+// REGISTER Action
+export async function registerUser(formData: any): Promise<AuthResponse> {
+  // 1. SECURITY CHECK: Verify Door Code
+  if (formData.doorCode !== "0129") {
+    return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
+  }
+
+  // 2. Prepare User Data
+  const newUser: User = {
+    id: Date.now(),
+    firstName: formData.firstName,
+    lastName: formData.lastName,
+    alias: formData.alias || "",
+    dob: formData.dob, 
+    role: formData.role,
+    phone: formData.phone,
+    profilePic: formData.profilePic || "",
+    joinedAt: new Date().toISOString()
+  };
+
+  // 3. Save to DB
+  const users = await getUsers();
+  const updatedUsers = [...users, newUser];
+  await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
+  
+  revalidatePath("/mates");
+  return { success: true, user: newUser };
+}
+
+// LOGIN Action
+export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
+  // 1. Verify Door Code
+  if (doorCode !== "0129") {
+    return { success: false, message: "❌ Incorrect Door Code." };
+  }
+
+  // 2. Find User by Phone
+  const users = await getUsers();
+  const user = users.find(u => u.phone === phone);
+
+  if (!user) {
+    return { success: false, message: "User not found. Check phone number or join first." };
+  }
+
+  return { success: true, user };
+}
+
+
+// ============================================================================
+// 4. COMMON ROOM POSTS SYSTEM
+// ============================================================================
+
+const POSTS_DB_PATH = path.join(process.cwd(), "app", "posts-db.json");
+
+export type Post = {
+  id: number;
+  author: string;
+  content: string;
+  timestamp: string;
+  editCount: number; // Tracks number of edits (Limit: 1)
+};
+
+export async function getPosts(): Promise<Post[]> {
+  try {
+    const data = await fs.readFile(POSTS_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function addPost(newPost: Post) {
+  const posts = await getPosts();
+  
+  // Enforce initial state
+  const postWithDefaults = { 
+    ...newPost, 
+    editCount: 0 
+  };
+  
+  const updated = [postWithDefaults, ...posts];
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/common-room");
+  return updated;
+}
+
+export async function editPost(postId: number, newContent: string) {
+  const posts = await getPosts();
+  const postIndex = posts.findIndex(p => p.id === postId);
+
+  if (postIndex === -1) {
+    return { success: false, message: "Post not found" };
+  }
+
+  const post = posts[postIndex];
+  
+  // CHECK 1: Edit Count Limit (Max 1)
+  const currentEdits = post.editCount || 0;
+  if (currentEdits >= 1) {
+    return { success: false, message: "🚫 Limit reached! You can only edit a post once." };
+  }
+
+  // CHECK 2: Time Limit (15 mins)
+  const postTime = new Date(post.timestamp).getTime();
+  const now = Date.now();
+  const fifteenMinutes = 15 * 60 * 1000;
+
+  if ((now - postTime) > fifteenMinutes) {
+    return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
+  }
+
+  // Apply Update
+  posts[postIndex].content = newContent;
+  posts[postIndex].editCount = currentEdits + 1; 
+  
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
+  revalidatePath("/common-room");
+  return { success: true };
+}
+
+// DELETE POST (Admin)
+export async function deletePost(id: number) {
+  const posts = await getPosts();
+  const updated = posts.filter(p => p.id !== id);
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/common-room");
+  return updated;
+}
+
+
+// ============================================================================
+// 5. CHAT SYSTEM (FILE BASED - TEMP DIR)
+// ============================================================================
+
+// Use OS Temp directory for write permissions in production/serverless
+const CHAT_DB_PATH = path.join(os.tmpdir(), "chat-db.json");
+
+export type ChatMessage = {
+  id: number;
+  author: string;
+  text: string;
+  timestamp: string;
+};
+
+export async function getChats(): Promise<ChatMessage[]> {
+  try {
+    const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, return empty array
+    return [];
+  }
+}
+
+export async function addChat(text: string, author: string) {
+  const chats = await getChats();
+  const newChat: ChatMessage = {
+    id: Date.now(),
+    author,
+    text,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Keep last 100 messages
+  const updatedChats = [...chats, newChat].slice(-100); 
+  
+  try {
+    await fs.writeFile(CHAT_DB_PATH, JSON.stringify(updatedChats, null, 2));
+  } catch (error) {
+    console.error("Failed to write chat DB:", error);
+  }
+  
+  return updatedChats;
 }
 </file>
 
