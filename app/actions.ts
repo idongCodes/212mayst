@@ -135,6 +135,7 @@ export type User = {
   firstName: string;
   lastName: string;
   alias?: string; // Optional alias
+  dob?: string;
   role: string;
   phone: string;
   joinedAt: string;
@@ -168,7 +169,8 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     id: Date.now(),
     firstName: formData.firstName,
     lastName: formData.lastName,
-    alias: formData.alias || "", 
+    alias: formData.alias || "",
+    dob: formData.dob, 
     role: formData.role,
     phone: formData.phone,
     joinedAt: new Date().toISOString()
