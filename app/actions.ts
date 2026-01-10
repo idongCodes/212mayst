@@ -1,6 +1,6 @@
 /**
  * file: app/actions.ts
- * description: Server actions for Praise, Feedback, Users (Auth), and Common Room Posts.
+ * description: Switched Chat System to In-Memory storage to fix production persistence issues.
  */
 
 "use server";
@@ -30,7 +30,8 @@ const PRAISE_SEED_DATA: Praise[] = [
     name: "Idong", 
     role: "Tenant", 
     subject: "🚀 🥂", 
-    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽" 
+    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽",
+    submittedAt: new Date().toISOString()
   }
 ];
 
@@ -47,14 +48,14 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const praises = await getPraises();
-
+  
   // Ensure timestamp is present
   const praiseWithDate = {
     ...newPraise,
     submittedAt: newPraise.submittedAt || new Date().toISOString()
   };
 
-  const updatedPraises = [newPraise, ...praises];
+  const updatedPraises = [praiseWithDate, ...praises];
   await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
   revalidatePath("/"); // Refresh Home page
   return updatedPraises;
@@ -285,11 +286,10 @@ export async function deletePost(id: number) {
   return updated;
 }
 
-// ============================================================================
-// 5. CHAT SYSTEM (NEW)
-// ============================================================================
 
-const CHAT_DB_PATH = path.join(process.cwd(), "app", "chat-db.json");
+// ============================================================================
+// 5. CHAT SYSTEM (IN-MEMORY FOR PRODUCTION COMPATIBILITY)
+// ============================================================================
 
 export type ChatMessage = {
   id: number;
@@ -298,18 +298,15 @@ export type ChatMessage = {
   timestamp: string;
 };
 
+// Global variable acts as "database" in memory.
+// WARNING: This data will be lost when the server restarts or lambda spins down.
+let globalChats: ChatMessage[] = []; 
+
 export async function getChats(): Promise<ChatMessage[]> {
-  try {
-    const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    // If file doesn't exist, start empty
-    return [];
-  }
+  return globalChats;
 }
 
 export async function addChat(text: string, author: string) {
-  const chats = await getChats();
   const newChat: ChatMessage = {
     id: Date.now(),
     author,
@@ -317,10 +314,8 @@ export async function addChat(text: string, author: string) {
     timestamp: new Date().toISOString()
   };
   
-  // Keep only last 100 messages to prevent file from getting too huge
-  const updatedChats = [...chats, newChat].slice(-100); 
+  // Keep only last 100 messages
+  globalChats = [...globalChats, newChat].slice(-100); 
   
-  await fs.writeFile(CHAT_DB_PATH, JSON.stringify(updatedChats, null, 2));
-  // No revalidatePath needed since we poll/refresh client-side for chat
-  return updatedChats;
+  return globalChats;
 }
