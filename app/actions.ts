@@ -220,6 +220,7 @@ export type Post = {
   content: string;
   timestamp: string;
   editCount: number; // Tracks number of edits (Limit: 1)
+  replies?: Reply[];
 };
 
 export async function getPosts(): Promise<Post[]> {
@@ -244,6 +245,33 @@ export async function addPost(newPost: Post) {
   await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
   revalidatePath("/common-room");
   return updated;
+}
+
+export async function addReply(postId: number, content: string, author: string) {
+  const posts = await getPosts();
+  const postIndex = posts.findIndex(p => p.id === postId);
+
+  if (postIndex === -1) {
+    return { success: false, message: "Post not found" };
+  }
+
+  const newReply: Reply = {
+    id: Date.now(),
+    author,
+    content,
+    timestamp: new Date().toISOString()
+  };
+
+  // Initialize replies array if it doesn't exist
+  if (!posts[postIndex].replies) {
+    posts[postIndex].replies = [];
+  }
+
+  posts[postIndex].replies?.push(newReply);
+
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
+  revalidatePath("/common-room");
+  return { success: true, updatedPost: posts[postIndex] };
 }
 
 export async function editPost(postId: number, newContent: string) {
