@@ -48,12 +48,20 @@ app/
   common-room/
     page.tsx
   components/
+    AutoLogout.tsx
+    FeedbackForm.tsx
     Footer.tsx
     Header.tsx
     Navigation.tsx
+    PraiseForm.tsx
+    RouteGuard.tsx
   contact/
     page.tsx
   feedback/
+    page.tsx
+  join/
+    page.tsx
+  login/
     page.tsx
   mates/
     page.tsx
@@ -62,19 +70,21 @@ app/
   notifications/
     page.tsx
   actions.ts
-  favicon.ico
   feedback-db.json
   globals.css
   layout.tsx
   page.tsx
+  posts-db.json
   praise-db.json
+  users-db.json
 public/
   about.mp4
   file.svg
   globe.svg
   hero.png
   heroVid.mov
-  logo.png
+  logo+favicon.ico
+  logo+favicon.jpg
   next.svg
   vercel.svg
   window.svg
@@ -90,15 +100,332 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
+<file path="app/components/FeedbackForm.tsx">
+/**
+ * file: app/components/FeedbackForm.tsx
+ * description: Reusable Feedback form that locks itself for unauthenticated users.
+ */
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { MessageSquare, Lock, Send, AlertTriangle } from 'lucide-react';
+import { addFeedback } from '../actions';
+import Link from 'next/link';
+
+export default function FeedbackForm() {
+  const [formData, setFormData] = useState({ subject: "", message: "" });
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    await addFeedback({
+      id: Date.now(),
+      name: user.alias || user.firstName,
+      role: user.role,
+      subject: formData.subject,
+      message: formData.message,
+      submittedAt: new Date().toISOString()
+    });
+    setLoading(false);
+    setFormData({ subject: "", message: "" });
+    alert("Feedback submitted. Thank you!");
+  };
+
+  return (
+    <div style={{ 
+      backgroundColor: 'white', 
+      padding: '1.5rem', 
+      borderRadius: '20px', 
+      boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+      marginTop: '2rem'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+        <MessageSquare size={24} color="#f59e0b" />
+        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>House Feedback</h3>
+      </div>
+
+      {!user ? (
+        // LOCKED STATE
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '1.5rem', 
+          backgroundColor: '#fffbeb', 
+          borderRadius: '12px',
+          border: '1px dashed #fcd34d'
+        }}>
+          <Lock size={24} color="#d97706" style={{ marginBottom: '0.5rem' }} />
+          <p style={{ margin: 0, color: '#b45309', fontSize: '0.9rem' }}>
+            <Link href="/login" style={{ color: '#d97706', fontWeight: 'bold', textDecoration: 'underline' }}>Log in</Link> to submit issues or suggestions.
+          </p>
+        </div>
+      ) : (
+        // UNLOCKED FORM
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <input 
+            type="text" 
+            placeholder="Subject (e.g. Wifi, Cleaning)"
+            value={formData.subject}
+            onChange={e => setFormData({...formData, subject: e.target.value})}
+            required
+            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}
+          />
+          <textarea 
+            placeholder="Describe the issue..." 
+            value={formData.message}
+            onChange={e => setFormData({...formData, message: e.target.value})}
+            required
+            rows={3}
+            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', resize: 'none' }}
+          />
+          <button 
+            type="submit" 
+            disabled={loading}
+            style={{ 
+              alignSelf: 'flex-end',
+              backgroundColor: '#f59e0b', 
+              color: 'white', 
+              border: 'none', 
+              padding: '8px 16px', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex', alignItems: 'center', gap: '5px'
+            }}
+          >
+            {loading ? '...' : <>Submit <Send size={16} /></>}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="app/components/PraiseForm.tsx">
+/**
+ * file: app/components/PraiseForm.tsx
+ * description: A component to submit Praise. Hides form for non-auth users.
+ */
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Heart, Lock, Sparkles } from 'lucide-react';
+import { addPraise } from '../actions';
+import Link from 'next/link';
+
+export default function PraiseForm() {
+  const [message, setMessage] = useState("");
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !message.trim()) return;
+
+    setLoading(true);
+    await addPraise({
+      id: Date.now(),
+      name: user.alias || user.firstName,
+      role: user.role,
+      subject: "Praise", // Default subject
+      message: message
+    });
+    setLoading(false);
+    setMessage("");
+    alert("Praise sent! 🎉");
+  };
+
+  return (
+    <div style={{ 
+      backgroundColor: 'white', 
+      padding: '1.5rem', 
+      borderRadius: '20px', 
+      boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+      marginTop: '2rem'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+        <Heart fill="var(--light-green)" color="var(--light-green)" size={24} />
+        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>Give Praise</h3>
+      </div>
+
+      {/* RESTRICTED ACCESS */}
+      {!user ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '1.5rem', 
+          backgroundColor: '#f8fafc', 
+          borderRadius: '12px',
+          border: '1px dashed #cbd5e1'
+        }}>
+          <Lock size={24} color="#94a3b8" style={{ marginBottom: '0.5rem' }} />
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
+            <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>Log in</Link> to send praise to your housemates.
+          </p>
+        </div>
+      ) : (
+        /* AUTHENTICATED FORM */
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
+          <input 
+            type="text" 
+            placeholder={`Who is awesome today, ${user.firstName}?`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              borderRadius: '12px', 
+              border: '1px solid #e2e8f0', 
+              outline: 'none',
+              backgroundColor: '#f8fafc'
+            }}
+          />
+          <button 
+            type="submit" 
+            disabled={loading}
+            style={{ 
+              backgroundColor: 'var(--light-green)', 
+              color: '#171717', 
+              border: 'none', 
+              padding: '12px', 
+              borderRadius: '12px', 
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            {loading ? '...' : <Sparkles size={20} />}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
 <file path="app/chat/page.tsx">
 export default function Chat() {
   return <div className="p-4 text-center">House Chat</div>;
 }
 </file>
 
-<file path="app/common-room/page.tsx">
-export default function CommonRoom() {
-  return <div className="p-4 text-center">Common Room</div>;
+<file path="app/components/AutoLogout.tsx">
+/**
+ * file: app/components/AutoLogout.tsx
+ * description: Handles auto-logout on 15m inactivity. Closing tab/browser is handled by sessionStorage.
+ */
+
+"use client";
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function AutoLogout() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // 15 Minutes in milliseconds
+    const TIMEOUT_MS = 15 * 60 * 1000; 
+    let timeoutId: NodeJS.Timeout;
+
+    const performLogout = () => {
+      // Only proceed if a user is actually logged in
+      if (sessionStorage.getItem('212user')) {
+        sessionStorage.removeItem('212user');
+        alert("Session timed out due to inactivity.");
+        router.push('/'); // Redirect to landing page
+      }
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(performLogout, TIMEOUT_MS);
+    };
+
+    // Events that constitute "activity"
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+
+    // Attach listeners
+    events.forEach(event => document.addEventListener(event, resetTimer));
+
+    // Initialize timer
+    resetTimer();
+
+    // Cleanup listeners on unmount
+    return () => {
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [router]);
+
+  return null; // This component renders nothing
+}
+</file>
+
+<file path="app/components/RouteGuard.tsx">
+/**
+ * file: app/components/RouteGuard.tsx
+ * description: Restricts access to private routes for logged-out users.
+ */
+
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+
+// Define the routes anyone can see
+const PUBLIC_ROUTES = ['/', '/login', '/join'];
+
+export default function RouteGuard({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    // 1. Check if the current route is public
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      setIsAuthorized(true);
+      return;
+    }
+
+    // 2. If route is private, check for user session
+    const user = sessionStorage.getItem('212user');
+
+    if (!user) {
+      // User is Guest trying to access Private Route -> Block & Redirect
+      setIsAuthorized(false);
+      router.push('/login'); 
+    } else {
+      // User is Logged In -> Allow
+      setIsAuthorized(true);
+    }
+  }, [pathname, router]);
+
+  // Prevent flashing of protected content while checking
+  // Only render children if authorized OR if we are on a public route
+  if (!isAuthorized && !PUBLIC_ROUTES.includes(pathname)) {
+    return null; // Render nothing (or a loading spinner) while redirecting
+  }
+
+  return <>{children}</>;
 }
 </file>
 
@@ -109,72 +436,188 @@ export default function Contact() {
 </file>
 
 <file path="app/feedback/page.tsx">
-import Link from "next/link";
-import { getFeedback } from "../actions";
+/**
+ * file: app/feedback/page.tsx
+ * description: Removed submission form. Now strictly displays the list of previous feedback.
+ */
 
-// Force dynamic so we always see new data
-export const dynamic = 'force-dynamic';
+"use client";
 
-export default async function FeedbackPage() {
-  const feedbacks = await getFeedback();
+import React, { useState, useEffect } from 'react';
+import { User as UserIcon } from 'lucide-react';
+import { getFeedback, Feedback } from '../actions';
+
+export default function FeedbackPage() {
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    const loadFeedback = async () => {
+      const data = await getFeedback();
+      setFeedbackList(data);
+    };
+    loadFeedback();
+  }, []);
+
+  const formatDate = (isoString: string) => {
+    return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <main style={{ minHeight: '100vh', padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>
-          Feature Requests & Bugs
-        </h1>
-        <p style={{ color: 'gray', marginTop: '10px' }}>
-          Things we need to fix or build next.
-        </p>
-        <Link 
-          href="/" 
-          style={{ 
-            display: 'inline-block', 
-            marginTop: '1rem', 
-            textDecoration: 'underline', 
-            color: 'var(--sky-blue)',
-            fontWeight: 'bold' 
-          }}
-        >
-          ← Back Home
-        </Link>
-      </div>
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        
+        {/* HEADER */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>House Feedback</h1>
+          <p style={{ color: 'gray' }}>A log of suggestions and reports.</p>
+        </div>
 
-      <div style={{ display: 'grid', gap: '1.5rem' }}>
-        {feedbacks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#f9fafb', borderRadius: '20px' }}>
-                <p style={{ color: 'gray' }}>No feedback yet. Be the first!</p>
-            </div>
-        ) : (
-            feedbacks.map((f) => (
-                <div key={f.id} style={{ 
-                    backgroundColor: 'white', 
-                    padding: '1.5rem', 
-                    borderRadius: '15px', 
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
-                    border: '1px solid #e5e7eb'
+        {/* FEEDBACK LIST VIEW */}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {feedbackList.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem', fontStyle: 'italic' }}>
+                No feedback submitted yet.
+              </div>
+            ) : (
+              feedbackList.map((item) => (
+                <div key={item.id} style={{ 
+                  backgroundColor: 'white', 
+                  padding: '1.5rem', 
+                  borderRadius: '20px', 
+                  border: '1px solid #f1f5f9',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.02)' 
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#171717' }}>
-                            {f.subject}
-                        </h3>
-                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-                            {new Date(f.submittedAt).toLocaleDateString()}
-                        </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b' }}>{item.subject}</h4>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(item.submittedAt)}</span>
+                  </div>
+                  
+                  <p style={{ color: '#475569', lineHeight: '1.5', margin: '0 0 1rem 0' }}>{item.message}</p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <UserIcon size={14} color="#0284c7" />
                     </div>
-                    
-                    <p style={{ color: '#4b5563', lineHeight: '1.5', marginBottom: '1rem' }}>
-                        {f.message}
-                    </p>
-                    
-                    <div style={{ fontSize: '0.9rem', borderTop: '1px solid #f3f4f6', paddingTop: '10px', display: 'flex', gap: '10px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{f.name}</span>
-                        <span style={{ color: 'var(--sky-blue)' }}>• {f.role}</span>
-                    </div>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                      {item.name} <span style={{ fontWeight: 'normal', opacity: 0.7 }}>({item.role})</span>
+                    </span>
+                  </div>
                 </div>
-            ))
-        )}
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/login/page.tsx">
+/**
+ * file: app/login/page.tsx
+ * description: Login page accepting Phone and Door Code. Redirects to Common Room on success.
+ */
+
+"use client";
+
+import React, { useState } from 'react';
+import { Phone, Key, LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { loginUser } from '../actions';
+
+export default function Login() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    phone: "",
+    doorCode: ""
+  });
+  
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (status === 'error') {
+      setStatus('idle');
+      setErrorMessage("");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+
+    const result = await loginUser(formData.phone, formData.doorCode);
+
+    if (result.success && result.user) {
+      sessionStorage.setItem('212user', JSON.stringify(result.user));
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/common-room');
+      }, 1000);
+    } else {
+      setStatus('error');
+      setErrorMessage(result.message || "Login failed");
+    }
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
+      
+      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+        
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem auto', backgroundColor: 'var(--sky-blue)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(135, 206, 235, 0.4)' }}>
+            <LogIn size={40} color="white" />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Welcome Back</h1>
+          <p style={{ color: '#64748b' }}>Unlock the door to get in.</p>
+        </div>
+
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
+              <div style={{ position: 'relative' }}>
+                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="tel" name="phone" placeholder="(508) 555-0123" required value={formData.phone} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
+              <div style={{ position: 'relative' }}>
+                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="password" name="doorCode" placeholder="Enter code" required value={formData.doorCode} onChange={handleChange} maxLength={4} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} />
+              </div>
+              
+              {status === 'error' && (
+                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <AlertCircle size={16} />
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+
+            <button type="submit" disabled={status === 'loading' || status === 'success'} style={{ marginTop: '1rem', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', color: status === 'success' ? '#171717' : 'white', border: 'none', padding: '16px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(244, 164, 96, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              {status === 'loading' ? <><Loader2 className="animate-spin" size={20}/> Checking Key...</> : status === 'success' ? "Unlocked!" : "Login"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <Link href="/join" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>
+              New here? <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</span>
+            </Link>
+          </div>
+
+        </div>
       </div>
     </main>
   );
@@ -199,86 +642,24 @@ export default function Notifications() {
 }
 </file>
 
-<file path="app/actions.ts">
-"use server";
-
-import fs from "fs/promises";
-import path from "path";
-import { revalidatePath } from "next/cache";
-
-// --- PRAISE SYSTEM ---
-const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
-
-type Praise = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-};
-
-// ... existing praise seed data ...
-const PRAISE_SEED_DATA: Praise[] = [
-  { 
-    id: 1, 
-    name: "Idong", 
-    role: "Tenant", 
-    subject: "🚀 🥂", 
-    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽" 
-  }
-];
-
-export async function getPraises(): Promise<Praise[]> {
-  try {
-    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
-    return PRAISE_SEED_DATA;
-  }
-}
-
-export async function addPraise(newPraise: Praise) {
-  const praises = await getPraises();
-  const updatedPraises = [newPraise, ...praises];
-  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
-  revalidatePath("/");
-  return updatedPraises;
-}
-
-// --- NEW: FEEDBACK SYSTEM ---
-const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
-
-export type Feedback = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-  submittedAt: string;
-};
-
-export async function getFeedback(): Promise<Feedback[]> {
-  try {
-    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    // If file doesn't exist, return empty array
-    return [];
-  }
-}
-
-export async function addFeedback(newFeedback: Feedback) {
-  const list = await getFeedback();
-  const updated = [newFeedback, ...list];
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
-  revalidatePath("/feedback"); // Refresh the feedback page
-  return updated;
-}
-</file>
-
 <file path="app/feedback-db.json">
 [
+  {
+    "id": 1768051669770,
+    "name": "hjgkj",
+    "role": "Tenant",
+    "subject": "kjkjlhkj",
+    "message": "hjgkhg",
+    "submittedAt": "2026-01-10T13:27:49.770Z"
+  },
+  {
+    "id": 1768051621376,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "hgk",
+    "message": "hjkjg",
+    "submittedAt": "2026-01-10T13:27:01.376Z"
+  },
   {
     "id": 1767915877558,
     "name": "Idong",
@@ -290,14 +671,73 @@ export async function addFeedback(newFeedback: Feedback) {
 ]
 </file>
 
+<file path="app/posts-db.json">
+[
+  {
+    "id": 1768048167773,
+    "author": "idongcodes",
+    "content": "You guys have no idea how excited I am to see you all start using this 🚀👀🙌",
+    "timestamp": "2026-01-10T12:29:27.773Z"
+  },
+  {
+    "id": 1768047956509,
+    "author": "idongcodes",
+    "content": "I'm really excited to see where this goes ! 😭",
+    "timestamp": "2026-01-10T12:25:56.509Z"
+  },
+  {
+    "id": 1709999,
+    "author": "System",
+    "content": "Welcome to the Common Room! 👋",
+    "timestamp": "2026-01-10T12:00:00.000Z"
+  }
+]
+</file>
+
 <file path="app/praise-db.json">
 [
+  {
+    "id": 1768051656146,
+    "name": "lhk",
+    "role": "Tenant",
+    "subject": "kjhl",
+    "message": "fgkjhg"
+  },
+  {
+    "id": 1768051604870,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "gkhjg",
+    "message": "jgjg"
+  },
   {
     "id": 1,
     "name": "Idong",
     "role": "Tenant",
     "subject": "🚀 🥂",
     "message": "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽"
+  }
+]
+</file>
+
+<file path="app/users-db.json">
+[
+  {
+    "id": 1,
+    "firstName": "Kay",
+    "lastName": "Udechukwu",
+    "role": "Landlord",
+    "phone": "555-0101",
+    "joinedAt": "2026-01-01T12:00:00.000Z"
+  },
+  {
+    "id": 1768047885245,
+    "firstName": "Idong",
+    "lastName": "Essien",
+    "alias": "idongcodes",
+    "role": "Tenant",
+    "phone": "16179037216",
+    "joinedAt": "2026-01-10T12:24:45.245Z"
   }
 ]
 </file>
@@ -781,125 +1221,143 @@ export default function About() {
 }
 </file>
 
-<file path="app/components/Header.tsx">
+<file path="app/join/page.tsx">
+/**
+ * file: app/join/page.tsx
+ * description: Updated to use sessionStorage for auto-cleanup on tab close.
+ */
+
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import React, { useState } from 'react';
+import { User, Phone, Key, ShieldCheck, ChevronRight, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { registerUser } from '../actions';
 
-export default function Header() {
-  const pathname = usePathname();
-  
-  // HIDE HEADER on: Home page AND About page
-  const isHidden = pathname === "/" || pathname === "/about";
-
-  if (isHidden) return null;
-
-  // Otherwise, render the standard Sky Blue Glass header
-  return (
-    <header 
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-        width: '100%',
-        padding: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        backgroundColor: 'rgba(135, 206, 235, 0.6)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      }}
-    >
-      <Link href="/" style={{ textDecoration: 'none' }}>
-        <h1 style={{ 
-          margin: 0, 
-          fontSize: '1.5rem', 
-          fontWeight: 'bold',
-          color: 'var(--text-color)'
-        }}>
-          212 May St
-        </h1>
-      </Link>
-    </header>
-  );
-}
-</file>
-
-<file path="app/components/Navigation.tsx">
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Armchair, Bed, Users, Bell, Info, Mail, MessageCircle } from "lucide-react";
-
-export default function Navigation() {
-  const pathname = usePathname();
-  const isActive = (path: string) => pathname === path;
-
-  // Helper for Link Styles
-  const getLinkStyle = (path: string) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af', // Gray fallback
-    fontWeight: isActive(path) ? 'bold' : 'normal',
-    transition: 'color 0.2s ease'
+export default function Join() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    alias: "",
+    role: "Tenant",
+    phone: "",
+    doorCode: ""
   });
+  
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (status === 'error') {
+      setStatus('idle');
+      setErrorMessage("");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+
+    const result = await registerUser(formData);
+
+    if (result.success && result.user) {
+      // CHANGED: Use sessionStorage instead of localStorage
+      // This ensures data is cleared when the tab/browser is closed.
+      sessionStorage.setItem('212user', JSON.stringify(result.user));
+      
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/common-room'); 
+      }, 1500);
+    } else {
+      setStatus('error');
+      setErrorMessage(result.message || "Something went wrong");
+    }
+  };
 
   return (
-    <>
-      {/* Bottom Nav Bar */}
-      <nav 
-        style={{
-          position: 'fixed',
-          bottom: '1.5rem',
-          left: '1rem',
-          zIndex: 100,
-          display: 'flex',
-          gap: '15px',
-          alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          borderRadius: '50px',
-          padding: '12px 20px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-        }}
-      >
-        <Link href="/" style={getLinkStyle("/")}><Home size={20} /></Link>
-        <Link href="/common-room" style={getLinkStyle("/common-room")}><Armchair size={20} /></Link>
-        <Link href="/my-room" style={getLinkStyle("/my-room")}><Bed size={20} /></Link>
-        <Link href="/mates" style={getLinkStyle("/mates")}><Users size={20} /></Link>
-        <Link href="/notifications" style={getLinkStyle("/notifications")}><Bell size={20} /></Link>
-        <Link href="/about" style={getLinkStyle("/about")}><Info size={20} /></Link>
-        <Link href="/contact" style={getLinkStyle("/contact")}><Mail size={20} /></Link>
-      </nav>
-
-      {/* Chat Button */}
-      <Link
-        href="/chat"
-        style={{
-          position: 'fixed',
-          bottom: '1.5rem',
-          right: '1rem',
-          zIndex: 100,
-          height: '48px',
-          width: '48px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--light-green)',
-          color: isActive("/chat") ? 'white' : '#171717',
-          borderRadius: '50%',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: isActive("/chat") ? '2px solid white' : 'none'
-        }}
-      >
-        <MessageCircle size={24} />
-      </Link>
-    </>
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
+      {/* ... (The rest of the UI remains identical, ommitted for brevity) ... */}
+       <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem auto', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)', transition: 'background-color 0.5s' }}>
+            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
+          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0', transition: 'border-color 0.3s' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
+                <div style={{ position: 'relative' }}>
+                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
+                <input type="text" name="lastName" placeholder="Doe" required value={formData.lastName} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+              </div>
+            </div>
+            <div>
+               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
+                 <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
+               </label>
+               <div style={{ position: 'relative' }}>
+                  <Sparkles size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input type="text" name="alias" placeholder="e.g. 'The Chef'" value={formData.alias} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+               </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
+              <div style={{ position: 'relative' }}>
+                <select name="role" value={formData.role} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', backgroundColor: 'white', appearance: 'none' }}>
+                  <option value="Tenant">Tenant</option>
+                  <option value="Landlord">Landlord</option>
+                  <option value="First Lady">First Lady</option>
+                </select>
+                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                  <ChevronRight size={16} color="#94a3b8" style={{ transform: 'rotate(90deg)' }} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
+              <div style={{ position: 'relative' }}>
+                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="tel" name="phone" placeholder="(508) 555-0123" required value={formData.phone} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
+              <div style={{ position: 'relative' }}>
+                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="password" name="doorCode" placeholder="Enter the 4-digit code" required value={formData.doorCode} onChange={handleChange} maxLength={4} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} />
+              </div>
+              {status === 'error' && (
+                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <AlertCircle size={16} />
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+            <button type="submit" disabled={status === 'loading' || status === 'success'} style={{ marginTop: '1rem', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sky-blue)', color: status === 'success' ? '#171717' : 'white', border: 'none', padding: '16px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(135, 206, 235, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              {status === 'loading' ? <><Loader2 className="animate-spin" size={20}/>Unlocking</> : status === 'success' ? "Success! Redirecting..." : "Unlock & Join"}
+            </button>
+          </form>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <Link href="/" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>← Back to Home</Link>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
 </file>
@@ -949,6 +1407,676 @@ export default function Footer() {
         </p>
       </div>
     </footer>
+  );
+}
+</file>
+
+<file path="app/components/Header.tsx">
+/**
+ * file: app/components/Header.tsx
+ * description: Replaced text logo with round clickable 'logo+favicon.jpg'.
+ */
+
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+export default function Header() {
+  const pathname = usePathname();
+  
+  // HIDE HEADER on: Home page AND About page
+  const isHidden = pathname === "/" || pathname === "/about";
+
+  if (isHidden) return null;
+
+  return (
+    <header 
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        width: '100%',
+        padding: '0.5rem 1rem',
+        display: 'flex',
+        alignItems: 'center',
+        // justify-content: 'center', // Uncomment if you prefer a centered logo
+        backgroundColor: 'rgba(135, 206, 235, 0.6)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+      }}
+    >
+      <Link href="/" style={{ display: 'block', borderRadius: '50%', overflow: 'hidden', width: '50px', height: '50px' }}>
+        <Image 
+          src="/logo+favicon.jpg" 
+          alt="212 May St Logo"
+          width={50}
+          height={50}
+          style={{ 
+            objectFit: 'cover',
+            width: '100%',
+            height: '100%'
+          }} 
+          priority
+        />
+      </Link>
+    </header>
+  );
+}
+</file>
+
+<file path="app/components/Navigation.tsx">
+/**
+ * file: app/components/Navigation.tsx
+ * description: Restricts navigation items for guests (Home & Login only).
+ */
+
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn } from "lucide-react";
+import { useEffect, useState } from "react";
+
+export default function Navigation() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Check login status on mount and path change
+    const checkLogin = () => {
+      const user = sessionStorage.getItem('212user');
+      setIsLoggedIn(!!user);
+    };
+    checkLogin();
+  }, [pathname]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('212user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
+  const isActive = (path: string) => pathname === path;
+
+  const getLinkStyle = (path: string) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af',
+    fontWeight: isActive(path) ? 'bold' : 'normal',
+    transition: 'color 0.2s ease',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0
+  });
+
+  return (
+    <>
+      <nav 
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          left: '50%',
+          transform: 'translateX(-50%)', // Center the nav
+          zIndex: 100,
+          display: 'flex',
+          gap: '20px',
+          alignItems: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: '50px',
+          padding: '12px 25px',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        {/* ALWAYS VISIBLE: Home */}
+        <Link href="/" style={getLinkStyle("/")} title="Home"><Home size={24} /></Link>
+        
+        {/* AUTHENTICATED ONLY LINKS */}
+        {isLoggedIn && (
+          <>
+            <Link href="/common-room" style={getLinkStyle("/common-room")} title="Common Room"><Armchair size={24} /></Link>
+            <Link href="/my-room" style={getLinkStyle("/my-room")} title="My Room"><Bed size={24} /></Link>
+            <Link href="/mates" style={getLinkStyle("/mates")} title="Mates"><Users size={24} /></Link>
+            <Link href="/notifications" style={getLinkStyle("/notifications")} title="Notifications"><Bell size={24} /></Link>
+            <Link href="/about" style={getLinkStyle("/about")} title="About"><Info size={24} /></Link>
+          </>
+        )}
+
+        {/* SEPARATOR (Only if logged in to separate logout) */}
+        <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
+
+        {/* LOGIN / LOGOUT TOGGLE */}
+        {isLoggedIn ? (
+          <button 
+            onClick={handleLogout} 
+            style={getLinkStyle("logout")} 
+            title="Log Out"
+          >
+            <LogOut size={24} color="#ef4444" />
+          </button>
+        ) : (
+          <Link 
+            href="/login" 
+            style={getLinkStyle("/login")}
+            title="Log In"
+          >
+            <LogIn size={24} color="var(--sky-blue)" />
+          </Link>
+        )}
+      </nav>
+
+      {/* CHAT BUTTON - Only show if Logged In */}
+      {isLoggedIn && (
+        <Link
+          href="/chat"
+          style={{
+            position: 'fixed',
+            bottom: '6rem', // Moved up slightly to avoid overlap
+            right: '1rem',
+            zIndex: 100,
+            height: '56px',
+            width: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--light-green)',
+            color: isActive("/chat") ? 'white' : '#171717',
+            borderRadius: '50%',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            border: isActive("/chat") ? '2px solid white' : 'none'
+          }}
+        >
+          <MessageCircle size={28} />
+        </Link>
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="app/actions.ts">
+/**
+ * file: app/actions.ts
+ * description: Server actions for Praise, Feedback, Users (Auth), and Common Room Posts.
+ */
+
+"use server";
+
+import fs from "fs/promises";
+import path from "path";
+import { revalidatePath } from "next/cache";
+
+// ============================================================================
+// 1. PRAISE SYSTEM
+// ============================================================================
+
+const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
+
+type Praise = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+};
+
+const PRAISE_SEED_DATA: Praise[] = [
+  { 
+    id: 1, 
+    name: "Idong", 
+    role: "Tenant", 
+    subject: "🚀 🥂", 
+    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽" 
+  }
+];
+
+export async function getPraises(): Promise<Praise[]> {
+  try {
+    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, create it with seed data
+    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
+    return PRAISE_SEED_DATA;
+  }
+}
+
+export async function addPraise(newPraise: Praise) {
+  const praises = await getPraises();
+  const updatedPraises = [newPraise, ...praises];
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
+  revalidatePath("/"); // Refresh Home page
+  return updatedPraises;
+}
+
+
+// ============================================================================
+// 2. FEEDBACK SYSTEM
+// ============================================================================
+
+const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
+
+export type Feedback = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+  submittedAt: string;
+};
+
+export async function getFeedback(): Promise<Feedback[]> {
+  try {
+    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function addFeedback(newFeedback: Feedback) {
+  const list = await getFeedback();
+  const updated = [newFeedback, ...list];
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+
+// ============================================================================
+// 3. USER SYSTEM (AUTH & REGISTRATION)
+// ============================================================================
+
+const USERS_DB_PATH = path.join(process.cwd(), "app", "users-db.json");
+
+export type User = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  alias?: string; // Optional alias
+  role: string;
+  phone: string;
+  joinedAt: string;
+};
+
+// Response type for Auth actions
+type AuthResponse = {
+  success: boolean;
+  message?: string;
+  user?: User;
+};
+
+export async function getUsers(): Promise<User[]> {
+  try {
+    const data = await fs.readFile(USERS_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+// REGISTER Action
+export async function registerUser(formData: any): Promise<AuthResponse> {
+  // 1. SECURITY CHECK: Verify Door Code
+  if (formData.doorCode !== "0129") {
+    return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
+  }
+
+  // 2. Prepare User Data
+  const newUser: User = {
+    id: Date.now(),
+    firstName: formData.firstName,
+    lastName: formData.lastName,
+    alias: formData.alias || "", // Default to empty string if undefined
+    role: formData.role,
+    phone: formData.phone,
+    joinedAt: new Date().toISOString()
+  };
+
+  // 3. Save to DB
+  const users = await getUsers();
+  
+  // Optional: Check if phone already exists? 
+  // For now, we allow duplicates or assume unique phones.
+  
+  const updatedUsers = [...users, newUser];
+  await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
+  
+  revalidatePath("/mates");
+  return { success: true, user: newUser };
+}
+
+// LOGIN Action
+export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
+  // 1. Verify Door Code
+  if (doorCode !== "0129") {
+    return { success: false, message: "❌ Incorrect Door Code." };
+  }
+
+  // 2. Find User by Phone
+  const users = await getUsers();
+  
+  // Clean phone input if needed (optional), currently doing exact match
+  const user = users.find(u => u.phone === phone);
+
+  if (!user) {
+    return { success: false, message: "User not found. Check phone number or join first." };
+  }
+
+  return { success: true, user };
+}
+
+
+// ============================================================================
+// 4. COMMON ROOM POSTS SYSTEM
+// ============================================================================
+
+const POSTS_DB_PATH = path.join(process.cwd(), "app", "posts-db.json");
+
+export type Post = {
+  id: number;
+  author: string;
+  content: string;
+  timestamp: string;
+  editCount: number; // Tracks number of edits (Limit: 1)
+};
+
+export async function getPosts(): Promise<Post[]> {
+  try {
+    const data = await fs.readFile(POSTS_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function addPost(newPost: Post) {
+  const posts = await getPosts();
+  
+  // Enforce initial state
+  const postWithDefaults = { 
+    ...newPost, 
+    editCount: 0 
+  };
+  
+  const updated = [postWithDefaults, ...posts];
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/common-room");
+  return updated;
+}
+
+export async function editPost(postId: number, newContent: string) {
+  const posts = await getPosts();
+  const postIndex = posts.findIndex(p => p.id === postId);
+
+  if (postIndex === -1) {
+    return { success: false, message: "Post not found" };
+  }
+
+  const post = posts[postIndex];
+  
+  // CHECK 1: Edit Count Limit (Max 1)
+  const currentEdits = post.editCount || 0;
+  if (currentEdits >= 1) {
+    return { success: false, message: "🚫 Limit reached! You can only edit a post once." };
+  }
+
+  // CHECK 2: Time Limit (15 mins)
+  const postTime = new Date(post.timestamp).getTime();
+  const now = Date.now();
+  const timeDiff = now - postTime;
+  const fifteenMinutes = 15 * 60 * 1000;
+
+  if (timeDiff > fifteenMinutes) {
+    return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
+  }
+
+  // Apply Update
+  posts[postIndex].content = newContent;
+  posts[postIndex].editCount = currentEdits + 1; // Increment count
+  
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
+  revalidatePath("/common-room");
+  return { success: true };
+}
+</file>
+
+<file path="app/common-room/page.tsx">
+/**
+ * file: app/common-room/page.tsx
+ * description: Updated to read user identity from sessionStorage.
+ */
+
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check } from 'lucide-react';
+import { addPost, getPosts, editPost, Post } from '../actions';
+import Link from 'next/link';
+
+const COMMON_EMOJIS = [
+  "😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔",
+  "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", 
+  "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋",
+  "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"
+];
+
+const MAX_CHARS = 250;
+
+export default function CommonRoom() {
+  // ... (State declarations same as before)
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [message, setMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [saveLoading, setSaveLoading] = useState(false);
+  
+  const [authorName, setAuthorName] = useState("Guest");
+  const [isGuest, setIsGuest] = useState(true);
+  
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      const data = await getPosts();
+      setPosts(data);
+    };
+    loadPosts();
+
+    // CHANGED: Check sessionStorage instead of localStorage
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setAuthorName(user.alias || user.firstName);
+      setIsGuest(false);
+    }
+  }, []);
+
+  // ... (Rest of the component remains exactly the same, omitted for brevity) ...
+
+  // Auto-resize textarea when message changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; 
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; 
+    }
+  }, [message]);
+
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingId]);
+
+  const handleCameraClick = () => cameraInputRef.current?.click();
+  const handleUploadClick = () => uploadInputRef.current?.click();
+
+  const handleEmojiClick = (emoji: string) => {
+    if (message.length + emoji.length <= MAX_CHARS) {
+      setMessage(prev => prev + emoji);
+    }
+  };
+
+  const handlePostSubmit = async () => {
+    if (!message.trim()) return;
+
+    setLoading(true);
+    const newPost: Post = {
+      id: Date.now(),
+      author: authorName,
+      content: message.trim(),
+      timestamp: new Date().toISOString(),
+      editCount: 0
+    };
+
+    setPosts([newPost, ...posts]);
+    setMessage("");
+    setShowEmojiPicker(false);
+    
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
+    await addPost(newPost);
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); 
+      handlePostSubmit();
+    }
+  };
+
+  const isEditable = (post: Post) => {
+    if ((post.editCount || 0) >= 1) return false;
+    const postTime = new Date(post.timestamp).getTime();
+    const fifteenMinutes = 15 * 60 * 1000;
+    return (Date.now() - postTime) < fifteenMinutes;
+  };
+
+  const startEditing = (post: Post) => {
+    setEditingId(post.id);
+    setEditText(post.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    
+    setSaveLoading(true);
+    const result = await editPost(editingId, editText.trim());
+    
+    if (result.success) {
+      setPosts(posts.map(p => 
+        p.id === editingId 
+          ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } 
+          : p
+      ));
+      setEditingId(null);
+      setEditText("");
+    } else {
+      alert(result.message);
+      setEditingId(null);
+    }
+    setSaveLoading(false);
+  };
+
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
+            {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
+          </h1>
+          {isGuest ? (
+            <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p>
+          ) : (
+            <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>
+          )}
+        </div>
+
+        <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
+              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
+              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
+              {showEmojiPicker && (
+                <>
+                  <div onClick={() => setShowEmojiPicker(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 40, cursor: 'default' }} />
+                  <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {COMMON_EMOJIS.map((emoji) => (
+                      <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button onClick={handlePostSubmit} disabled={loading} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
+          </div>
+          <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
+            <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><Camera size={24} /></div>
+            <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><ImageIcon size={24} /></div>
+          </div>
+          <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" hidden />
+          <input type="file" ref={uploadInputRef} accept="image/*" hidden />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {posts.map((post) => (
+            <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
+              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <User size={20} color="#0284c7" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
+                  </div>
+                  {!editingId && post.author === authorName && isEditable(post) && (
+                    <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit (One time only, 15m limit)"><Pencil size={16} /></button>
+                  )}
+                </div>
+                {editingId === post.id ? (
+                  <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
+                    <button onClick={saveEdit} disabled={saveLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#171717' }}><Check size={16} /></button>
+                    <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                )}
+              </div>
+            </div>
+          ))}
+          {posts.length === 0 && (<div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No posts yet. Be the first to say hi! 👋</div>)}
+        </div>
+      </div>
+    </main>
   );
 }
 </file>
@@ -1381,15 +2509,25 @@ a {
 </file>
 
 <file path="app/layout.tsx">
+/**
+ * file: app/layout.tsx
+ * description: Wrapped children in RouteGuard to enforce access control.
+ */
+
 import type { Metadata } from "next";
 import "./globals.css"; 
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import Header from "./components/Header"; 
+import AutoLogout from "./components/AutoLogout"; 
+import RouteGuard from "./components/RouteGuard"; // <--- Import the Guard
 
 export const metadata: Metadata = {
   title: "212 May Street",
   description: "A web app for 212 May Street housemates.",
+  icons: {
+    icon: '/logo+favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -1400,12 +2538,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Header />
+        {/* Handles 15-min inactivity logout */}
+        <AutoLogout />
 
-        {children}
+        {/* Protects routes based on login status */}
+        <RouteGuard>
+          <Header />
+          
+          {children}
 
-        <Footer />
-        <Navigation />
+          <Footer />
+          <Navigation />
+        </RouteGuard>
       </body>
     </html>
   );

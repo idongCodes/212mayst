@@ -1,8 +1,13 @@
+/**
+ * file: app/page.tsx
+ * description: Home/Dashboard page with authentication restrictions on Praise and Feedback forms.
+ */
+
 "use client"; 
 
-import React, { useState, useEffect, useRef } from "react"; // Added useRef
+import React, { useState, useEffect, useRef } from "react"; 
 import Link from "next/link";
-import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb } from "lucide-react";
+import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock } from "lucide-react";
 import { getPraises, addPraise, addFeedback } from "./actions";
 
 // --- HELPER COMPONENT: FADE IN ON SCROLL ---
@@ -13,7 +18,6 @@ function FadeInSection({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        // Only set visible to TRUE (never set back to false, so it stays visible once scrolled past)
         if (entry.isIntersecting) {
           setIsVisible(true);
         }
@@ -53,6 +57,8 @@ type Praise = {
 export default function Home() {
   const [praises, setPraises] = useState<Praise[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null); // Track User Session
+
   const [praiseForm, setPraiseForm] = useState({
     name: "", role: "Tenant", subject: "", message: ""
   });
@@ -64,9 +70,20 @@ export default function Home() {
 
   useEffect(() => {
     const loadData = async () => {
+      // Load Praises
       const data = await getPraises();
       setPraises(data);
       setLoading(false);
+
+      // Check Session
+      const storedUser = sessionStorage.getItem('212user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        // Pre-fill forms with user data if available
+        setPraiseForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
+        setFeedbackForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
+      }
     };
     loadData();
   }, []);
@@ -87,7 +104,7 @@ export default function Home() {
 
     const newPraise = { id: Date.now(), ...praiseForm };
     setPraises([newPraise, ...praises]); 
-    setPraiseForm({ name: "", role: "Tenant", subject: "", message: "" });
+    setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     await addPraise(newPraise);
   };
 
@@ -102,7 +119,7 @@ export default function Home() {
         submittedAt: new Date().toISOString()
     };
     await addFeedback(newFeedback);
-    setFeedbackForm({ name: "", role: "Tenant", subject: "", message: "" });
+    setFeedbackForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     setFeedbackStatus("success");
     setTimeout(() => setFeedbackStatus("idle"), 3000);
   };
@@ -110,7 +127,7 @@ export default function Home() {
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* HERO SECTION - Wrapped in FadeInSection */}
+      {/* HERO SECTION */}
       <FadeInSection>
         <section 
           style={{
@@ -143,7 +160,7 @@ export default function Home() {
         </section>
       </FadeInSection>
 
-      {/* FEATURES SECTION - Wrapped */}
+      {/* FEATURES SECTION */}
       <FadeInSection>
         <section style={{ backgroundColor: 'var(--sky-blue)', padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
           <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
@@ -166,7 +183,7 @@ export default function Home() {
         </section>
       </FadeInSection>
 
-      {/* PRAISE SECTION - Wrapped */}
+      {/* PRAISE SECTION */}
       <FadeInSection>
         <section style={{ backgroundColor: '#f9fafb', padding: '4rem 1.5rem' }}>
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -193,37 +210,51 @@ export default function Home() {
 
             <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
-              <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
-                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>First Name</label>
-                    <input type="text" name="name" value={praiseForm.name} onChange={handlePraiseChange} placeholder="Jane" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+              
+              {!user ? (
+                // LOCKED STATE (Light Theme)
+                <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '2px dashed #e2e8f0', color: '#94a3b8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                    <Lock size={32} color="#cbd5e1" />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
-                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Role</label>
-                    <select name="role" value={praiseForm.role} onChange={handlePraiseChange} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', backgroundColor: 'white' }}>
-                      <option value="Tenant">Tenant</option>
-                      <option value="Owner">Owner</option>
-                      <option value="First Lady">First Lady</option>
-                    </select>
+                  <p style={{ fontSize: '1rem' }}>
+                    You must be <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>logged in</Link> to leave praise.
+                  </p>
+                </div>
+              ) : (
+                // FORM (Authenticated)
+                <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>First Name</label>
+                      <input type="text" name="name" value={praiseForm.name} onChange={handlePraiseChange} placeholder="Jane" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Role</label>
+                      <select name="role" value={praiseForm.role} onChange={handlePraiseChange} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', backgroundColor: 'white' }}>
+                        <option value="Tenant">Tenant</option>
+                        <option value="Owner">Owner</option>
+                        <option value="First Lady">First Lady</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Subject</label>
-                  <input type="text" name="subject" value={praiseForm.subject} onChange={handlePraiseChange} placeholder="Just saying hi!" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Message</label>
-                  <textarea name="message" value={praiseForm.message} onChange={handlePraiseChange} placeholder="Share your thoughts..." required rows={4} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', fontFamily: 'inherit' }} />
-                </div>
-                <button type="submit" style={{ marginTop: '10px', backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.2s', width: '100%' }}>Send Praise <Send size={18} /></button>
-              </form>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Subject</label>
+                    <input type="text" name="subject" value={praiseForm.subject} onChange={handlePraiseChange} placeholder="Just saying hi!" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Message</label>
+                    <textarea name="message" value={praiseForm.message} onChange={handlePraiseChange} placeholder="Share your thoughts..." required rows={4} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', fontFamily: 'inherit' }} />
+                  </div>
+                  <button type="submit" style={{ marginTop: '10px', backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.2s', width: '100%' }}>Send Praise <Send size={18} /></button>
+                </form>
+              )}
             </div>
           </div>
         </section>
       </FadeInSection>
 
-      {/* FEEDBACK SECTION - Wrapped */}
+      {/* FEEDBACK SECTION */}
       <FadeInSection>
         <section style={{ backgroundColor: '#1e293b', padding: '4rem 1.5rem', color: 'white' }}>
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -239,38 +270,51 @@ export default function Home() {
               <Link href="/feedback" style={{ color: 'var(--sky-blue)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>View submitted feedback</Link>
             </p>
 
-            <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
-                  <input type="text" name="name" value={feedbackForm.name} onChange={handleFeedbackChange} placeholder="John" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+            {!user ? (
+              // LOCKED STATE (Dark Theme)
+              <div style={{ backgroundColor: '#334155', padding: '3rem', borderRadius: '20px', textAlign: 'center', border: '1px dashed #475569', color: '#94a3b8' }}>
+                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
+                    <Lock size={32} color="#64748b" />
+                 </div>
+                 <p style={{ fontSize: '1rem' }}>
+                   Please <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>log in</Link> to submit feedback.
+                 </p>
+              </div>
+            ) : (
+              // FORM (Authenticated)
+              <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
+                    <input type="text" name="name" value={feedbackForm.name} onChange={handleFeedbackChange} placeholder="John" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Role</label>
+                    <select name="role" value={feedbackForm.role} onChange={handleFeedbackChange} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }}>
+                      <option value="Tenant">Tenant</option>
+                      <option value="Landlord">Landlord</option>
+                      <option value="First Lady">First Lady</option>
+                    </select>
+                  </div>
                 </div>
-                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Role</label>
-                  <select name="role" value={feedbackForm.role} onChange={handleFeedbackChange} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }}>
-                    <option value="Tenant">Tenant</option>
-                    <option value="Landlord">Landlord</option>
-                    <option value="First Lady">First Lady</option>
-                  </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Subject</label>
+                  <input type="text" name="subject" value={feedbackForm.subject} onChange={handleFeedbackChange} placeholder="Feature Request: Dark Mode" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
                 </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Subject</label>
-                <input type="text" name="subject" value={feedbackForm.subject} onChange={handleFeedbackChange} placeholder="Feature Request: Dark Mode" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Message</label>
-                <textarea name="message" value={feedbackForm.message} onChange={handleFeedbackChange} placeholder="Tell us what's on your mind..." required rows={4} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem', fontFamily: 'inherit' }} />
-              </div>
-              <button type="submit" disabled={feedbackStatus === "submitting" || feedbackStatus === "success"} style={{ backgroundColor: feedbackStatus === "success" ? 'var(--light-green)' : 'var(--sky-blue)', color: feedbackStatus === "success" ? '#171717' : 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', opacity: feedbackStatus === "submitting" ? 0.7 : 1 }}>
-                {feedbackStatus === "submitting" ? "Sending..." : feedbackStatus === "success" ? "Received! Thanks." : "Submit Feedback"}
-              </button>
-            </form>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Message</label>
+                  <textarea name="message" value={feedbackForm.message} onChange={handleFeedbackChange} placeholder="Tell us what's on your mind..." required rows={4} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem', fontFamily: 'inherit' }} />
+                </div>
+                <button type="submit" disabled={feedbackStatus === "submitting" || feedbackStatus === "success"} style={{ backgroundColor: feedbackStatus === "success" ? 'var(--light-green)' : 'var(--sky-blue)', color: feedbackStatus === "success" ? '#171717' : 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', opacity: feedbackStatus === "submitting" ? 0.7 : 1 }}>
+                  {feedbackStatus === "submitting" ? "Sending..." : feedbackStatus === "success" ? "Received! Thanks." : "Submit Feedback"}
+                </button>
+              </form>
+            )}
           </div>
         </section>
       </FadeInSection>
 
-      {/* WHAT'S NEW SECTION - Wrapped */}
+      {/* WHAT'S NEW SECTION */}
       <FadeInSection>
         <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>

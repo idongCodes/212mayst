@@ -1,69 +1,76 @@
-import Link from "next/link";
-import { getFeedback } from "../actions";
+/**
+ * file: app/feedback/page.tsx
+ * description: Removed submission form. Now strictly displays the list of previous feedback.
+ */
 
-// Force dynamic so we always see new data
-export const dynamic = 'force-dynamic';
+"use client";
 
-export default async function FeedbackPage() {
-  const feedbacks = await getFeedback();
+import React, { useState, useEffect } from 'react';
+import { User as UserIcon } from 'lucide-react';
+import { getFeedback, Feedback } from '../actions';
+
+export default function FeedbackPage() {
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    const loadFeedback = async () => {
+      const data = await getFeedback();
+      setFeedbackList(data);
+    };
+    loadFeedback();
+  }, []);
+
+  const formatDate = (isoString: string) => {
+    return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <main style={{ minHeight: '100vh', padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>
-          Feature Requests & Bugs
-        </h1>
-        <p style={{ color: 'gray', marginTop: '10px' }}>
-          Things we need to fix or build next.
-        </p>
-        <Link 
-          href="/" 
-          style={{ 
-            display: 'inline-block', 
-            marginTop: '1rem', 
-            textDecoration: 'underline', 
-            color: 'var(--sky-blue)',
-            fontWeight: 'bold' 
-          }}
-        >
-          ← Back Home
-        </Link>
-      </div>
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        
+        {/* HEADER */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>House Feedback</h1>
+          <p style={{ color: 'gray' }}>A log of suggestions and reports.</p>
+        </div>
 
-      <div style={{ display: 'grid', gap: '1.5rem' }}>
-        {feedbacks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#f9fafb', borderRadius: '20px' }}>
-                <p style={{ color: 'gray' }}>No feedback yet. Be the first!</p>
-            </div>
-        ) : (
-            feedbacks.map((f) => (
-                <div key={f.id} style={{ 
-                    backgroundColor: 'white', 
-                    padding: '1.5rem', 
-                    borderRadius: '15px', 
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
-                    border: '1px solid #e5e7eb'
+        {/* FEEDBACK LIST VIEW */}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {feedbackList.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem', fontStyle: 'italic' }}>
+                No feedback submitted yet.
+              </div>
+            ) : (
+              feedbackList.map((item) => (
+                <div key={item.id} style={{ 
+                  backgroundColor: 'white', 
+                  padding: '1.5rem', 
+                  borderRadius: '20px', 
+                  border: '1px solid #f1f5f9',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.02)' 
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#171717' }}>
-                            {f.subject}
-                        </h3>
-                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-                            {new Date(f.submittedAt).toLocaleDateString()}
-                        </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b' }}>{item.subject}</h4>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(item.submittedAt)}</span>
+                  </div>
+                  
+                  <p style={{ color: '#475569', lineHeight: '1.5', margin: '0 0 1rem 0' }}>{item.message}</p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <UserIcon size={14} color="#0284c7" />
                     </div>
-                    
-                    <p style={{ color: '#4b5563', lineHeight: '1.5', marginBottom: '1rem' }}>
-                        {f.message}
-                    </p>
-                    
-                    <div style={{ fontSize: '0.9rem', borderTop: '1px solid #f3f4f6', paddingTop: '10px', display: 'flex', gap: '10px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{f.name}</span>
-                        <span style={{ color: 'var(--sky-blue)' }}>• {f.role}</span>
-                    </div>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                      {item.name} <span style={{ fontWeight: 'normal', opacity: 0.7 }}>({item.role})</span>
+                    </span>
+                  </div>
                 </div>
-            ))
-        )}
+              ))
+            )}
+          </div>
+        </div>
+
       </div>
     </main>
   );
