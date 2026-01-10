@@ -1,6 +1,6 @@
 /**
  * file: app/page.tsx
- * description: Home page. Hides testimonial names for unauthenticated users.
+ * description: Testimonials now show mm/dd/yyyy date + time.
  */
 
 "use client"; 
@@ -8,34 +8,20 @@
 import React, { useState, useEffect, useRef } from "react"; 
 import Link from "next/link";
 import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2 } from "lucide-react";
-import { getPraises, addPraise, addFeedback, deletePraise } from "./actions"; 
+import { getPraises, addPraise, addFeedback, deletePraise, Praise } from "./actions"; // Import Type
 
-// --- HELPER COMPONENT: FADE IN ON SCROLL ---
+// ... [FadeInSection and Imports] ...
 function FadeInSection({ children }: { children: React.ReactNode }) {
   const [isVisible, setIsVisible] = useState(false);
   const domRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) setIsVisible(true);
-      });
-    });
+    const observer = new IntersectionObserver(entries => { entries.forEach(entry => { if (entry.isIntersecting) setIsVisible(true); }); });
     const currentElement = domRef.current;
     if (currentElement) observer.observe(currentElement);
     return () => { if (currentElement) observer.unobserve(currentElement); };
   }, []);
-
   return <div ref={domRef} className={`fade-in-section ${isVisible ? 'is-visible' : ''}`} style={{ width: '100%' }}>{children}</div>;
 }
-
-type Praise = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-};
 
 export default function Home() {
   const [praises, setPraises] = useState<Praise[]>([]);
@@ -57,11 +43,7 @@ export default function Home() {
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        
-        if (parsedUser.alias === 'idongcodes') {
-          setIsAdmin(true);
-        }
-
+        if (parsedUser.alias === 'idongcodes') setIsAdmin(true);
         setPraiseForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
         setFeedbackForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
       }
@@ -69,31 +51,28 @@ export default function Home() {
     loadData();
   }, []);
 
+  // ... [Handlers: handlePraiseChange, handleFeedbackChange, handlePraiseSubmit, handleDeletePraise, handleFeedbackSubmit] ...
   const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setPraiseForm(prev => ({ ...prev, [name]: value }));
   };
-
   const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFeedbackForm(prev => ({ ...prev, [name]: value }));
   };
-
   const handlePraiseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!praiseForm.name || !praiseForm.message) return;
-    const newPraise = { id: Date.now(), ...praiseForm };
+    const newPraise = { id: Date.now(), ...praiseForm, submittedAt: new Date().toISOString() };
     setPraises([newPraise, ...praises]); 
     setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     await addPraise(newPraise);
   };
-
   const handleDeletePraise = async (id: number) => {
     if (!confirm("Are you sure you want to delete this praise?")) return;
     setPraises(praises.filter(p => p.id !== id));
     await deletePraise(id);
   };
-
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackForm.name || !feedbackForm.message) return;
@@ -105,10 +84,24 @@ export default function Home() {
     setTimeout(() => setFeedbackStatus("idle"), 3000);
   };
 
+  // HELPER: Date Formatter
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+  };
+
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* HERO SECTION */}
+      {/* HERO & FEATURES SECTIONS (Unchanged, condensed for focus) */}
       <FadeInSection>
         <section style={{ position: 'relative', height: '70vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', padding: '0 2rem' }}>
           <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
@@ -127,7 +120,6 @@ export default function Home() {
         </section>
       </FadeInSection>
 
-      {/* FEATURES SECTION */}
       <FadeInSection>
         <section style={{ backgroundColor: 'var(--sky-blue)', padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
           <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
@@ -163,7 +155,6 @@ export default function Home() {
                     {praises.map((p) => (
                       <div key={p.id} style={{ position: 'relative', backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
                         
-                        {/* ADMIN DELETE BUTTON */}
                         {isAdmin && (
                           <button 
                             onClick={() => handleDeletePraise(p.id)}
@@ -174,15 +165,22 @@ export default function Home() {
                           </button>
                         )}
 
-                        <div style={{ marginBottom: '0.5rem' }}><h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717' }}>{p.subject}</h4></div>
+                        <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717', margin: 0 }}>{p.subject}</h4>
+                          
+                          {/* DATE DISPLAY */}
+                          {p.submittedAt && (
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '10px' }}>
+                              {formatDate(p.submittedAt)}
+                            </span>
+                          )}
+                        </div>
+
                         <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            {/* NAME VISIBILITY CHECK: Only show name if logged in */}
-                            <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>
-                              {user ? p.name : "Housemate"}
-                            </span>
+                            <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{user ? p.name : "Housemate"}</span>
                             <span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span>
                           </div>
                         </div>
@@ -256,6 +254,7 @@ export default function Home() {
               </div>
             ) : (
               <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
+                {/* ... (Feedback Form inputs unchanged) ... */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                   <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
@@ -287,7 +286,6 @@ export default function Home() {
         </section>
       </FadeInSection>
       
-      {/* WHAT'S NEW */}
       <FadeInSection>
         <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
