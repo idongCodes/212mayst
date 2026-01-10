@@ -284,3 +284,43 @@ export async function deletePost(id: number) {
   revalidatePath("/common-room");
   return updated;
 }
+
+// ============================================================================
+// 5. CHAT SYSTEM (NEW)
+// ============================================================================
+
+const CHAT_DB_PATH = path.join(process.cwd(), "app", "chat-db.json");
+
+export type ChatMessage = {
+  id: number;
+  author: string;
+  text: string;
+  timestamp: string;
+};
+
+export async function getChats(): Promise<ChatMessage[]> {
+  try {
+    const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, start empty
+    return [];
+  }
+}
+
+export async function addChat(text: string, author: string) {
+  const chats = await getChats();
+  const newChat: ChatMessage = {
+    id: Date.now(),
+    author,
+    text,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Keep only last 100 messages to prevent file from getting too huge
+  const updatedChats = [...chats, newChat].slice(-100); 
+  
+  await fs.writeFile(CHAT_DB_PATH, JSON.stringify(updatedChats, null, 2));
+  // No revalidatePath needed since we poll/refresh client-side for chat
+  return updatedChats;
+}
