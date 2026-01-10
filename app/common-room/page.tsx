@@ -1,13 +1,13 @@
 /**
  * file: app/common-room/page.tsx
- * description: Updated to read user identity from sessionStorage.
+ * description: Added Admin Delete capability for 'idongcodes' on all posts.
  */
 
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check } from 'lucide-react';
-import { addPost, getPosts, editPost, Post } from '../actions';
+import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2 } from 'lucide-react';
+import { addPost, getPosts, editPost, deletePost, Post } from '../actions';
 import Link from 'next/link';
 
 const COMMON_EMOJIS = [
@@ -16,11 +16,9 @@ const COMMON_EMOJIS = [
   "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋",
   "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"
 ];
-
 const MAX_CHARS = 250;
 
 export default function CommonRoom() {
-  // ... (State declarations same as before)
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -32,7 +30,8 @@ export default function CommonRoom() {
   
   const [authorName, setAuthorName] = useState("Guest");
   const [isGuest, setIsGuest] = useState(true);
-  
+  const [isAdmin, setIsAdmin] = useState(false); // Admin check
+
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -45,18 +44,17 @@ export default function CommonRoom() {
     };
     loadPosts();
 
-    // CHANGED: Check sessionStorage instead of localStorage
     const storedUser = sessionStorage.getItem('212user');
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setAuthorName(user.alias || user.firstName);
       setIsGuest(false);
+      if (user.alias === 'idongcodes') {
+        setIsAdmin(true);
+      }
     }
   }, []);
 
-  // ... (Rest of the component remains exactly the same, omitted for brevity) ...
-
-  // Auto-resize textarea when message changes
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'; 
@@ -65,49 +63,27 @@ export default function CommonRoom() {
   }, [message]);
 
   useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-    }
+    if (editingId && editInputRef.current) editInputRef.current.focus();
   }, [editingId]);
 
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
-
-  const handleEmojiClick = (emoji: string) => {
-    if (message.length + emoji.length <= MAX_CHARS) {
-      setMessage(prev => prev + emoji);
-    }
-  };
-
+  const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
+  
   const handlePostSubmit = async () => {
     if (!message.trim()) return;
-
     setLoading(true);
-    const newPost: Post = {
-      id: Date.now(),
-      author: authorName,
-      content: message.trim(),
-      timestamp: new Date().toISOString(),
-      editCount: 0
-    };
-
+    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0 };
     setPosts([newPost, ...posts]);
     setMessage("");
     setShowEmojiPicker(false);
-    
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     await addPost(newPost);
     setLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); 
-      handlePostSubmit();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); }
   };
 
   const isEditable = (post: Post) => {
@@ -117,35 +93,27 @@ export default function CommonRoom() {
     return (Date.now() - postTime) < fifteenMinutes;
   };
 
-  const startEditing = (post: Post) => {
-    setEditingId(post.id);
-    setEditText(post.content);
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditText("");
-  };
-
+  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); };
+  const cancelEditing = () => { setEditingId(null); setEditText(""); };
+  
   const saveEdit = async () => {
     if (!editingId || !editText.trim()) return;
-    
     setSaveLoading(true);
     const result = await editPost(editingId, editText.trim());
-    
     if (result.success) {
-      setPosts(posts.map(p => 
-        p.id === editingId 
-          ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } 
-          : p
-      ));
-      setEditingId(null);
-      setEditText("");
+      setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p));
+      setEditingId(null); setEditText("");
     } else {
-      alert(result.message);
-      setEditingId(null);
+      alert(result.message); setEditingId(null);
     }
     setSaveLoading(false);
+  };
+
+  // ADMIN ACTION
+  const handleDeletePost = async (id: number) => {
+    if (!confirm("Admin: Delete this post?")) return;
+    setPosts(posts.filter(p => p.id !== id));
+    await deletePost(id);
   };
 
   const formatDate = (isoString: string) => {
@@ -156,6 +124,8 @@ export default function CommonRoom() {
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
             {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
@@ -167,6 +137,7 @@ export default function CommonRoom() {
           )}
         </div>
 
+        {/* Input */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -177,9 +148,7 @@ export default function CommonRoom() {
                 <>
                   <div onClick={() => setShowEmojiPicker(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 40, cursor: 'default' }} />
                   <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {COMMON_EMOJIS.map((emoji) => (
-                      <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>
-                    ))}
+                    {COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}
                   </div>
                 </>
               )}
@@ -194,6 +163,7 @@ export default function CommonRoom() {
           <input type="file" ref={uploadInputRef} accept="image/*" hidden />
         </div>
 
+        {/* Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
@@ -206,10 +176,22 @@ export default function CommonRoom() {
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
                   </div>
-                  {!editingId && post.author === authorName && isEditable(post) && (
-                    <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit (One time only, 15m limit)"><Pencil size={16} /></button>
-                  )}
+                  
+                  {/* ACTIONS GROUP */}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    
+                    {/* EDIT: Only Author */}
+                    {!editingId && post.author === authorName && isEditable(post) && (
+                      <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>
+                    )}
+
+                    {/* DELETE: Admin Only */}
+                    {isAdmin && (
+                      <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>
+                    )}
+                  </div>
                 </div>
+
                 {editingId === post.id ? (
                   <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />

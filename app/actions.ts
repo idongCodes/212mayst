@@ -52,6 +52,15 @@ export async function addPraise(newPraise: Praise) {
   return updatedPraises;
 }
 
+// DELETE PRAISE (Admin)
+export async function deletePraise(id: number) {
+  const praises = await getPraises();
+  const updated = praises.filter(p => p.id !== id);
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/");
+  return updated;
+}
+
 
 // ============================================================================
 // 2. FEEDBACK SYSTEM
@@ -66,6 +75,7 @@ export type Feedback = {
   subject: string;
   message: string;
   submittedAt: string;
+  read?: boolean; // Track read status
 };
 
 export async function getFeedback(): Promise<Feedback[]> {
@@ -79,7 +89,27 @@ export async function getFeedback(): Promise<Feedback[]> {
 
 export async function addFeedback(newFeedback: Feedback) {
   const list = await getFeedback();
-  const updated = [newFeedback, ...list];
+  // Ensure new feedback starts as unread
+  const feedbackWithStatus = { ...newFeedback, read: false };
+  const updated = [feedbackWithStatus, ...list];
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// DELETE FEEDBACK (Admin)
+export async function deleteFeedback(id: number) {
+  const list = await getFeedback();
+  const updated = list.filter(f => f.id !== id);
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// TOGGLE READ STATUS (Admin)
+export async function toggleFeedbackRead(id: number, isRead: boolean) {
+  const list = await getFeedback();
+  const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
   await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
   revalidatePath("/feedback");
   return updated;
@@ -130,7 +160,7 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     id: Date.now(),
     firstName: formData.firstName,
     lastName: formData.lastName,
-    alias: formData.alias || "", // Default to empty string if undefined
+    alias: formData.alias || "", 
     role: formData.role,
     phone: formData.phone,
     joinedAt: new Date().toISOString()
@@ -138,10 +168,6 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
 
   // 3. Save to DB
   const users = await getUsers();
-  
-  // Optional: Check if phone already exists? 
-  // For now, we allow duplicates or assume unique phones.
-  
   const updatedUsers = [...users, newUser];
   await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
   
@@ -158,8 +184,6 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
 
   // 2. Find User by Phone
   const users = await getUsers();
-  
-  // Clean phone input if needed (optional), currently doing exact match
   const user = users.find(u => u.phone === phone);
 
   if (!user) {
@@ -227,18 +251,26 @@ export async function editPost(postId: number, newContent: string) {
   // CHECK 2: Time Limit (15 mins)
   const postTime = new Date(post.timestamp).getTime();
   const now = Date.now();
-  const timeDiff = now - postTime;
   const fifteenMinutes = 15 * 60 * 1000;
 
-  if (timeDiff > fifteenMinutes) {
+  if ((now - postTime) > fifteenMinutes) {
     return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
   }
 
   // Apply Update
   posts[postIndex].content = newContent;
-  posts[postIndex].editCount = currentEdits + 1; // Increment count
+  posts[postIndex].editCount = currentEdits + 1; 
   
   await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
   revalidatePath("/common-room");
   return { success: true };
+}
+
+// DELETE POST (Admin)
+export async function deletePost(id: number) {
+  const posts = await getPosts();
+  const updated = posts.filter(p => p.id !== id);
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/common-room");
+  return updated;
 }
