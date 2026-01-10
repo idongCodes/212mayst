@@ -100,6 +100,65 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
+<file path="app/chat/page.tsx">
+export default function Chat() {
+  return <div className="p-4 text-center">House Chat</div>;
+}
+</file>
+
+<file path="app/components/AutoLogout.tsx">
+/**
+ * file: app/components/AutoLogout.tsx
+ * description: Handles auto-logout on 15m inactivity. Closing tab/browser is handled by sessionStorage.
+ */
+
+"use client";
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function AutoLogout() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // 15 Minutes in milliseconds
+    const TIMEOUT_MS = 15 * 60 * 1000; 
+    let timeoutId: NodeJS.Timeout;
+
+    const performLogout = () => {
+      // Only proceed if a user is actually logged in
+      if (sessionStorage.getItem('212user')) {
+        sessionStorage.removeItem('212user');
+        alert("Session timed out due to inactivity.");
+        router.push('/'); // Redirect to landing page
+      }
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(performLogout, TIMEOUT_MS);
+    };
+
+    // Events that constitute "activity"
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+
+    // Attach listeners
+    events.forEach(event => document.addEventListener(event, resetTimer));
+
+    // Initialize timer
+    resetTimer();
+
+    // Cleanup listeners on unmount
+    return () => {
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [router]);
+
+  return null; // This component renders nothing
+}
+</file>
+
 <file path="app/components/FeedbackForm.tsx">
 /**
  * file: app/components/FeedbackForm.tsx
@@ -321,65 +380,6 @@ export default function PraiseForm() {
 }
 </file>
 
-<file path="app/chat/page.tsx">
-export default function Chat() {
-  return <div className="p-4 text-center">House Chat</div>;
-}
-</file>
-
-<file path="app/components/AutoLogout.tsx">
-/**
- * file: app/components/AutoLogout.tsx
- * description: Handles auto-logout on 15m inactivity. Closing tab/browser is handled by sessionStorage.
- */
-
-"use client";
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export default function AutoLogout() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // 15 Minutes in milliseconds
-    const TIMEOUT_MS = 15 * 60 * 1000; 
-    let timeoutId: NodeJS.Timeout;
-
-    const performLogout = () => {
-      // Only proceed if a user is actually logged in
-      if (sessionStorage.getItem('212user')) {
-        sessionStorage.removeItem('212user');
-        alert("Session timed out due to inactivity.");
-        router.push('/'); // Redirect to landing page
-      }
-    };
-
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(performLogout, TIMEOUT_MS);
-    };
-
-    // Events that constitute "activity"
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
-
-    // Attach listeners
-    events.forEach(event => document.addEventListener(event, resetTimer));
-
-    // Initialize timer
-    resetTimer();
-
-    // Cleanup listeners on unmount
-    return () => {
-      events.forEach(event => document.removeEventListener(event, resetTimer));
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [router]);
-
-  return null; // This component renders nothing
-}
-</file>
-
 <file path="app/components/RouteGuard.tsx">
 /**
  * file: app/components/RouteGuard.tsx
@@ -432,86 +432,6 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 <file path="app/contact/page.tsx">
 export default function Contact() {
   return <div className="p-4 text-center">Contact</div>;
-}
-</file>
-
-<file path="app/feedback/page.tsx">
-/**
- * file: app/feedback/page.tsx
- * description: Removed submission form. Now strictly displays the list of previous feedback.
- */
-
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { User as UserIcon } from 'lucide-react';
-import { getFeedback, Feedback } from '../actions';
-
-export default function FeedbackPage() {
-  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
-
-  useEffect(() => {
-    const loadFeedback = async () => {
-      const data = await getFeedback();
-      setFeedbackList(data);
-    };
-    loadFeedback();
-  }, []);
-
-  const formatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
-  return (
-    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        
-        {/* HEADER */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>House Feedback</h1>
-          <p style={{ color: 'gray' }}>A log of suggestions and reports.</p>
-        </div>
-
-        {/* FEEDBACK LIST VIEW */}
-        <div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {feedbackList.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem', fontStyle: 'italic' }}>
-                No feedback submitted yet.
-              </div>
-            ) : (
-              feedbackList.map((item) => (
-                <div key={item.id} style={{ 
-                  backgroundColor: 'white', 
-                  padding: '1.5rem', 
-                  borderRadius: '20px', 
-                  border: '1px solid #f1f5f9',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.02)' 
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b' }}>{item.subject}</h4>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(item.submittedAt)}</span>
-                  </div>
-                  
-                  <p style={{ color: '#475569', lineHeight: '1.5', margin: '0 0 1rem 0' }}>{item.message}</p>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <UserIcon size={14} color="#0284c7" />
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-                      {item.name} <span style={{ fontWeight: 'normal', opacity: 0.7 }}>({item.role})</span>
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-      </div>
-    </main>
-  );
 }
 </file>
 
@@ -624,12 +544,6 @@ export default function Login() {
 }
 </file>
 
-<file path="app/mates/page.tsx">
-export default function Mates() {
-  return <div className="p-4 text-center">Mates</div>;
-}
-</file>
-
 <file path="app/my-room/page.tsx">
 export default function MyRoom() {
   return <div className="p-4 text-center">My Room</div>;
@@ -640,106 +554,6 @@ export default function MyRoom() {
 export default function Notifications() {
   return <div className="p-4 text-center">Notifications</div>;
 }
-</file>
-
-<file path="app/feedback-db.json">
-[
-  {
-    "id": 1768051669770,
-    "name": "hjgkj",
-    "role": "Tenant",
-    "subject": "kjkjlhkj",
-    "message": "hjgkhg",
-    "submittedAt": "2026-01-10T13:27:49.770Z"
-  },
-  {
-    "id": 1768051621376,
-    "name": "Idong",
-    "role": "Tenant",
-    "subject": "hgk",
-    "message": "hjkjg",
-    "submittedAt": "2026-01-10T13:27:01.376Z"
-  },
-  {
-    "id": 1767915877558,
-    "name": "Idong",
-    "role": "Tenant",
-    "subject": "Chat Feature ?",
-    "message": "I'd love a real time chat feature !",
-    "submittedAt": "2026-01-08T23:44:37.558Z"
-  }
-]
-</file>
-
-<file path="app/posts-db.json">
-[
-  {
-    "id": 1768048167773,
-    "author": "idongcodes",
-    "content": "You guys have no idea how excited I am to see you all start using this 🚀👀🙌",
-    "timestamp": "2026-01-10T12:29:27.773Z"
-  },
-  {
-    "id": 1768047956509,
-    "author": "idongcodes",
-    "content": "I'm really excited to see where this goes ! 😭",
-    "timestamp": "2026-01-10T12:25:56.509Z"
-  },
-  {
-    "id": 1709999,
-    "author": "System",
-    "content": "Welcome to the Common Room! 👋",
-    "timestamp": "2026-01-10T12:00:00.000Z"
-  }
-]
-</file>
-
-<file path="app/praise-db.json">
-[
-  {
-    "id": 1768051656146,
-    "name": "lhk",
-    "role": "Tenant",
-    "subject": "kjhl",
-    "message": "fgkjhg"
-  },
-  {
-    "id": 1768051604870,
-    "name": "Idong",
-    "role": "Tenant",
-    "subject": "gkhjg",
-    "message": "jgjg"
-  },
-  {
-    "id": 1,
-    "name": "Idong",
-    "role": "Tenant",
-    "subject": "🚀 🥂",
-    "message": "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽"
-  }
-]
-</file>
-
-<file path="app/users-db.json">
-[
-  {
-    "id": 1,
-    "firstName": "Kay",
-    "lastName": "Udechukwu",
-    "role": "Landlord",
-    "phone": "555-0101",
-    "joinedAt": "2026-01-01T12:00:00.000Z"
-  },
-  {
-    "id": 1768047885245,
-    "firstName": "Idong",
-    "lastName": "Essien",
-    "alias": "idongcodes",
-    "role": "Tenant",
-    "phone": "16179037216",
-    "joinedAt": "2026-01-10T12:24:45.245Z"
-  }
-]
 </file>
 
 <file path="public/file.svg">
@@ -1221,194 +1035,195 @@ export default function About() {
 }
 </file>
 
-<file path="app/join/page.tsx">
+<file path="app/mates/page.tsx">
 /**
- * file: app/join/page.tsx
- * description: Updated to use sessionStorage for auto-cleanup on tab close.
+ * file: app/mates/page.tsx
+ * description: Displays housemates with their Birthday (MM/DD) on the card.
  */
 
 "use client";
 
-import React, { useState } from 'react';
-import { User, Phone, Key, ShieldCheck, ChevronRight, AlertCircle, Loader2, Sparkles } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { registerUser } from '../actions';
+import React, { useEffect, useState } from 'react';
+import { User as UserIcon, Shield, Sparkles, Calendar, Cake } from 'lucide-react';
+import { getUsers, User } from '../actions';
 
-export default function Join() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    alias: "",
-    role: "Tenant",
-    phone: "",
-    doorCode: ""
-  });
-  
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
-  const [errorMessage, setErrorMessage] = useState("");
+export default function Mates() {
+  const [mates, setMates] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (status === 'error') {
-      setStatus('idle');
-      setErrorMessage("");
-    }
+  useEffect(() => {
+    const loadMates = async () => {
+      const data = await getUsers();
+      setMates(data);
+      setLoading(false);
+    };
+    loadMates();
+  }, []);
+
+  const formatJoinedDate = (isoString: string) => {
+    return new Date(isoString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      year: 'numeric' 
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('loading');
-
-    const result = await registerUser(formData);
-
-    if (result.success && result.user) {
-      // CHANGED: Use sessionStorage instead of localStorage
-      // This ensures data is cleared when the tab/browser is closed.
-      sessionStorage.setItem('212user', JSON.stringify(result.user));
-      
-      setStatus('success');
-      setTimeout(() => {
-        router.push('/common-room'); 
-      }, 1500);
-    } else {
-      setStatus('error');
-      setErrorMessage(result.message || "Something went wrong");
+  // Helper to turn "YYYY-MM-DD" into "MM/DD"
+  const formatBirthday = (dobString?: string) => {
+    if (!dobString) return "N/A";
+    // Split string to avoid timezone issues with Date() parsing
+    const parts = dobString.split('-'); // [YYYY, MM, DD]
+    if (parts.length === 3) {
+      return `${parts[1]}/${parts[2]}`; // MM/DD
     }
+    return dobString;
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
-      {/* ... (The rest of the UI remains identical, ommitted for brevity) ... */}
-       <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem auto', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)', transition: 'background-color 0.5s' }}>
-            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
-          </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
-          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '0.5rem' }}>
+            House Mates
+          </h1>
+          <p style={{ color: 'gray' }}>Meet the neighbors.</p>
         </div>
-        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0', transition: 'border-color 0.3s' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
-                </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+            Loading directory...
+          </div>
+        )}
+
+        {/* Mates Grid */}
+        <div className="animate-fade-in" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+          gap: '1.5rem' 
+        }}>
+          {mates.map((mate) => (
+            <div key={mate.id} style={{ 
+              backgroundColor: 'white', 
+              borderRadius: '24px', 
+              padding: '2rem', 
+              boxShadow: '0 10px 30px rgba(0,0,0,0.05)', 
+              border: '1px solid #f1f5f9',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              transition: 'transform 0.2s',
+              cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              
+              {/* Avatar Circle */}
+              <div style={{ 
+                width: '80px', height: '80px', 
+                backgroundColor: '#e0f2fe', 
+                borderRadius: '50%', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: '1rem',
+                color: '#0284c7'
+              }}>
+                <UserIcon size={40} />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
-                <input type="text" name="lastName" placeholder="Doe" required value={formData.lastName} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
-              </div>
-            </div>
-            <div>
-               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                 <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
-               </label>
-               <div style={{ position: 'relative' }}>
-                  <Sparkles size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input type="text" name="alias" placeholder="e.g. 'The Chef'" value={formData.alias} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
-               </div>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
-              <div style={{ position: 'relative' }}>
-                <select name="role" value={formData.role} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', backgroundColor: 'white', appearance: 'none' }}>
-                  <option value="Tenant">Tenant</option>
-                  <option value="Landlord">Landlord</option>
-                  <option value="First Lady">First Lady</option>
-                </select>
-                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                  <ChevronRight size={16} color="#94a3b8" style={{ transform: 'rotate(90deg)' }} />
-                </div>
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
-              <div style={{ position: 'relative' }}>
-                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input type="tel" name="phone" placeholder="(508) 555-0123" required value={formData.phone} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
-              <div style={{ position: 'relative' }}>
-                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input type="password" name="doorCode" placeholder="Enter the 4-digit code" required value={formData.doorCode} onChange={handleChange} maxLength={4} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} />
-              </div>
-              {status === 'error' && (
-                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                  <AlertCircle size={16} />
-                  {errorMessage}
+
+              {/* Name & Alias */}
+              <h3 style={{ margin: '0 0 5px 0', fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>
+                {mate.firstName} {mate.lastName}
+              </h3>
+              
+              {mate.alias && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--sandy-brown)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  <Sparkles size={14} /> {mate.alias}
                 </div>
               )}
+
+              {/* Divider */}
+              <div style={{ width: '100%', height: '1px', backgroundColor: '#e2e8f0', margin: '1rem 0' }} />
+
+              {/* Details */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
+                    <Shield size={16} /> Role
+                  </div>
+                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{mate.role}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
+                    <Calendar size={16} /> Joined
+                  </div>
+                  <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>{formatJoinedDate(mate.joinedAt)}</span>
+                </div>
+
+                {/* BIRTHDAY DISPLAY */}
+                {mate.dob && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.9rem' }}>
+                      <Cake size={16} /> Birthday
+                    </div>
+                    <span style={{ fontWeight: 'bold', color: '#334155', fontSize: '0.95rem' }}>
+                      {formatBirthday(mate.dob)}
+                    </span>
+                  </div>
+                )}
+
+              </div>
+
             </div>
-            <button type="submit" disabled={status === 'loading' || status === 'success'} style={{ marginTop: '1rem', backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sky-blue)', color: status === 'success' ? '#171717' : 'white', border: 'none', padding: '16px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(135, 206, 235, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-              {status === 'loading' ? <><Loader2 className="animate-spin" size={20}/>Unlocking</> : status === 'success' ? "Success! Redirecting..." : "Unlock & Join"}
-            </button>
-          </form>
-          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-            <Link href="/" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>← Back to Home</Link>
-          </div>
+          ))}
         </div>
+
+        {!loading && mates.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+            No housemates found. Strange... is the house empty? 👻
+          </div>
+        )}
+
       </div>
     </main>
   );
 }
 </file>
 
-<file path="app/components/Footer.tsx">
-"use client";
+<file path="app/posts-db.json">
+[
+  {
+    "id": 1768048167773,
+    "author": "idongcodes",
+    "content": "You guys have no idea how excited I am to see you all start using this 🚀👀🙌",
+    "timestamp": "2026-01-10T12:29:27.773Z"
+  },
+  {
+    "id": 1768047956509,
+    "author": "idongcodes",
+    "content": "I'm really excited to see where this goes ! 😭",
+    "timestamp": "2026-01-10T12:25:56.509Z"
+  }
+]
+</file>
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-export default function Footer() {
-  const pathname = usePathname();
-  const isAbout = pathname === "/about";
-
-  return (
-    <footer 
-      style={{
-        width: '100%',
-        // Conditional Background: Transparent on About, Sky Blue everywhere else
-        backgroundColor: isAbout ? 'transparent' : 'var(--sky-blue)', 
-        color: 'white',
-        padding: '3rem 1rem 8rem 1rem', 
-        textAlign: 'center',
-        marginTop: 'auto', 
-        // Remove border on About page for a cleaner look
-        borderTop: isAbout ? 'none' : '4px solid rgba(255,255,255,0.2)' 
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>
-          &copy; {new Date().getFullYear()} 212 May Street
-        </p>
-        <p style={{ margin: 0, opacity: 0.9 }}>
-          Built with 🫶 by{" "}
-          <Link 
-            href="https://idong-essien.vercel.app" 
-            target="_blank" 
-            style={{ 
-              fontWeight: 'bold', 
-              color: 'white', 
-              textDecoration: 'underline',
-              textUnderlineOffset: '4px'
-            }}
-          >
-            idongCodes
-          </Link>
-        </p>
-      </div>
-    </footer>
-  );
-}
+<file path="app/users-db.json">
+[
+  {
+    "id": 1768047885245,
+    "firstName": "Idong",
+    "lastName": "Essien",
+    "alias": "idongcodes",
+    "dob": "1986-06-21",
+    "role": "Tenant",
+    "phone": "16179037216",
+    "joinedAt": "2026-01-10T12:24:45.245Z"
+  }
+]
 </file>
 
 <file path="app/components/Header.tsx">
@@ -1463,6 +1278,638 @@ export default function Header() {
         />
       </Link>
     </header>
+  );
+}
+</file>
+
+<file path="app/feedback/page.tsx">
+/**
+ * file: app/feedback/page.tsx
+ * description: Feedback list with Admin Toolbar (Read/Unread/Delete).
+ */
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { User as UserIcon, Trash2, CheckCircle, Circle, Lock } from 'lucide-react';
+import { getFeedback, deleteFeedback, toggleFeedbackRead, Feedback } from '../actions';
+
+export default function FeedbackPage() {
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // 1. Check Admin Status
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      if (user.alias === 'idongcodes') {
+        setIsAdmin(true);
+      }
+    }
+
+    // 2. Load Data
+    const loadFeedback = async () => {
+      const data = await getFeedback();
+      setFeedbackList(data);
+    };
+    loadFeedback();
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this feedback?")) return;
+    setFeedbackList(feedbackList.filter(f => f.id !== id)); // Optimistic
+    await deleteFeedback(id);
+  };
+
+  const handleToggleRead = async (id: number, currentStatus: boolean | undefined) => {
+    const newStatus = !currentStatus;
+    setFeedbackList(feedbackList.map(f => f.id === id ? { ...f, read: newStatus } : f)); // Optimistic
+    await toggleFeedbackRead(id, newStatus);
+  };
+
+  const formatDate = (isoString: string) => {
+    return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem', paddingBottom: '8rem' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        
+        {/* HEADER */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>House Feedback</h1>
+          <p style={{ color: 'gray' }}>A log of suggestions and reports.</p>
+        </div>
+
+        {/* FEEDBACK LIST VIEW */}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {feedbackList.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem', fontStyle: 'italic' }}>
+                No feedback submitted yet.
+              </div>
+            ) : (
+              feedbackList.map((item) => (
+                <div key={item.id} style={{ 
+                  backgroundColor: item.read ? '#f8fafc' : 'white', // Dim if read
+                  opacity: item.read ? 0.7 : 1,
+                  padding: '1.5rem', 
+                  borderRadius: '20px', 
+                  border: item.read ? '1px solid #e2e8f0' : '1px solid #cbd5e1',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
+                  position: 'relative',
+                  transition: 'all 0.3s'
+                }}>
+                  
+                  {/* ADMIN TOOLBAR */}
+                  {isAdmin && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '10px', 
+                      right: '10px', 
+                      display: 'flex', 
+                      gap: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.8)',
+                      padding: '5px',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <button 
+                        onClick={() => handleToggleRead(item.id, item.read)}
+                        title={item.read ? "Mark Unread" : "Mark Read"}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        {item.read ? <CheckCircle size={18} color="#10b981" /> : <Circle size={18} color="#94a3b8" />}
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleDelete(item.id)}
+                        title="Delete"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Trash2 size={18} color="#ef4444" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', paddingRight: isAdmin ? '60px' : '0' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b' }}>{item.subject}</h4>
+                  </div>
+                   <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.5rem' }}>{formatDate(item.submittedAt)}</span>
+                  
+                  <p style={{ color: '#475569', lineHeight: '1.5', margin: '0 0 1rem 0' }}>{item.message}</p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <UserIcon size={14} color="#0284c7" />
+                    </div>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                      {item.name} <span style={{ fontWeight: 'normal', opacity: 0.7 }}>({item.role})</span>
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/join/page.tsx">
+/**
+ * file: app/join/page.tsx
+ * description: Added Date of Birth field to registration form.
+ */
+
+"use client";
+
+import React, { useState } from 'react';
+import { User, Phone, Key, ShieldCheck, ChevronRight, AlertCircle, Loader2, Sparkles, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { registerUser } from '../actions';
+
+export default function Join() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    alias: "",
+    dob: "", // <--- NEW STATE
+    role: "Tenant",
+    phone: "",
+    doorCode: ""
+  });
+  
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (status === 'error') {
+      setStatus('idle');
+      setErrorMessage("");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+
+    const result = await registerUser(formData);
+
+    if (result.success && result.user) {
+      sessionStorage.setItem('212user', JSON.stringify(result.user));
+      
+      setStatus('success');
+      setTimeout(() => {
+        router.push('/common-room'); 
+      }, 1500);
+    } else {
+      setStatus('error');
+      setErrorMessage(result.message || "Something went wrong");
+    }
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
+      
+      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+        
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ 
+            width: '80px', height: '80px', margin: '0 auto 1rem auto', 
+            backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', 
+            borderRadius: '50%', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)',
+            transition: 'background-color 0.5s'
+          }}>
+            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
+          </div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
+          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
+        </div>
+
+        {/* Form Card */}
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '2rem', 
+          borderRadius: '24px', 
+          boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
+          border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0',
+          transition: 'border-color 0.3s'
+        }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Name Fields Row */}
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
+                <div style={{ position: 'relative' }}>
+                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input 
+                    type="text" 
+                    name="firstName" 
+                    placeholder="Jane"
+                    required
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                  />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
+                <input 
+                  type="text" 
+                  name="lastName" 
+                  placeholder="Doe"
+                  required
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                />
+              </div>
+            </div>
+
+            {/* Alias Field */}
+            <div>
+               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
+                 <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
+               </label>
+               <div style={{ position: 'relative' }}>
+                  <Sparkles size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input 
+                    type="text" 
+                    name="alias" 
+                    placeholder="e.g. 'The Chef'"
+                    value={formData.alias}
+                    onChange={handleChange}
+                    style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                  />
+               </div>
+            </div>
+
+            {/* Date of Birth Field */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Date of Birth</label>
+              <div style={{ position: 'relative' }}>
+                <Calendar size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input 
+                  type="date" 
+                  name="dob" 
+                  required
+                  value={formData.dob}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', color: '#1e293b' }} 
+                />
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
+              <div style={{ position: 'relative' }}>
+                <select 
+                  name="role" 
+                  value={formData.role} 
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', backgroundColor: 'white', appearance: 'none' }}
+                >
+                  <option value="Tenant">Tenant</option>
+                  <option value="Landlord">Landlord</option>
+                  <option value="First Lady">First Lady</option>
+                </select>
+                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                  <ChevronRight size={16} color="#94a3b8" style={{ transform: 'rotate(90deg)' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
+              <div style={{ position: 'relative' }}>
+                <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="tel" 
+                  name="phone" 
+                  placeholder="(508) 555-0123"
+                  required
+                  value={formData.phone}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                />
+              </div>
+            </div>
+
+            {/* Door Code */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
+              <div style={{ position: 'relative' }}>
+                <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="password" 
+                  name="doorCode" 
+                  placeholder="Enter the 4-digit code"
+                  required
+                  value={formData.doorCode}
+                  onChange={handleChange}
+                  maxLength={4}
+                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', letterSpacing: '2px' }} 
+                />
+              </div>
+              
+              {status === 'error' && (
+                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', color: '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <AlertCircle size={16} />
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <button 
+              type="submit" 
+              disabled={status === 'loading' || status === 'success'}
+              style={{ 
+                marginTop: '1rem',
+                backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sky-blue)', 
+                color: status === 'success' ? '#171717' : 'white', 
+                border: 'none', 
+                padding: '16px', 
+                borderRadius: '12px', 
+                fontSize: '1.1rem', 
+                fontWeight: 'bold', 
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(135, 206, 235, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px'
+              }}
+            >
+              {status === 'loading' ? (
+                <>Unlocking <Loader2 className="animate-spin" size={20}/></>
+              ) : status === 'success' ? (
+                "Success! Redirecting..."
+              ) : (
+                "Unlock & Join"
+              )}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <Link href="/" style={{ fontSize: '0.9rem', color: '#64748b', textDecoration: 'none' }}>
+              ← Back to Home
+            </Link>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/feedback-db.json">
+[
+  {
+    "id": 1767915877558,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "Chat Feature ?",
+    "message": "I'd love a real time chat feature !",
+    "submittedAt": "2026-01-08T23:44:37.558Z",
+    "read": false
+  }
+]
+</file>
+
+<file path="app/components/Footer.tsx">
+/**
+ * file: app/components/Footer.tsx
+ * description: Added donation modal with links to PayPal, Venmo, and Cash App.
+ */
+
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { X, CreditCard, Banknote, Send, Heart } from "lucide-react";
+
+export default function Footer() {
+  const pathname = usePathname();
+  const isAbout = pathname === "/about";
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Helper to close modal when clicking outside content
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setIsModalOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <footer 
+        style={{
+          width: '100%',
+          backgroundColor: isAbout ? 'transparent' : 'var(--sky-blue)', 
+          color: 'white',
+          padding: '3rem 1rem 8rem 1rem', 
+          textAlign: 'center',
+          marginTop: 'auto', 
+          borderTop: isAbout ? 'none' : '4px solid rgba(255,255,255,0.2)' 
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>
+            &copy; {new Date().getFullYear()} 212 May Street
+          </p>
+          <p style={{ margin: 0, opacity: 0.9 }}>
+            Built with 🫶 by{" "}
+            <Link 
+              href="https://idong-essien.vercel.app" 
+              target="_blank" 
+              style={{ 
+                fontWeight: 'bold', 
+                color: 'white', 
+                textDecoration: 'underline',
+                textUnderlineOffset: '4px'
+              }}
+            >
+              idongCodes
+            </Link>
+          </p>
+          
+          {/* Donation Trigger */}
+          <p 
+            onClick={() => setIsModalOpen(true)}
+            style={{ 
+              marginTop: '1rem', 
+              fontSize: '0.85rem', 
+              opacity: 0.8, 
+              cursor: 'pointer',
+              textDecoration: 'underline dotted',
+              transition: 'opacity 0.2s'
+            }}
+            className="hover:opacity-100"
+          >
+            Consider donating here & there to help keep this project going.
+          </p>
+        </div>
+      </footer>
+
+      {/* DONATION MODAL */}
+      {isModalOpen && (
+        <div 
+          onClick={handleOverlayClick}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          className="animate-fade-in"
+        >
+          <div style={{
+            backgroundColor: 'white',
+            color: '#1e293b',
+            padding: '2rem',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '350px',
+            position: 'relative',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            animation: 'slideIn 0.3s ease-out'
+          }}>
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: '#f1f5f9',
+                border: 'none',
+                borderRadius: '50%',
+                padding: '8px',
+                cursor: 'pointer',
+                color: '#64748b'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ 
+                margin: '0 auto 1rem auto', 
+                width: '60px', height: '60px', 
+                backgroundColor: '#ffe4e6', 
+                borderRadius: '50%', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center' 
+              }}>
+                <Heart size={30} color="#fb7185" fill="#fb7185" />
+              </div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>Support the Dev</h3>
+              <p style={{ color: '#64748b', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                Thanks for keeping the lights on! Choose your preferred app below.
+              </p>
+            </div>
+
+            {/* Links Grid */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {/* PayPal */}
+              <a 
+                href="https://paypal.me/idongcodes" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '15px',
+                  padding: '16px',
+                  backgroundColor: '#0070ba', // PayPal Blue
+                  color: 'white',
+                  borderRadius: '16px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 10px rgba(0, 112, 186, 0.2)'
+                }}
+              >
+                <CreditCard size={24} />
+                <span>PayPal</span>
+              </a>
+
+              {/* Venmo */}
+              <a 
+                href="https://www.venmo.com/u/idongcodes" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '15px',
+                  padding: '16px',
+                  backgroundColor: '#008CFF', // Venmo Blue
+                  color: 'white',
+                  borderRadius: '16px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 10px rgba(0, 140, 255, 0.2)'
+                }}
+              >
+                <Send size={24} />
+                <span>Venmo</span>
+              </a>
+
+              {/* Cash App */}
+              <a 
+                href="https://cash.app/$richardxessien" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '15px',
+                  padding: '16px',
+                  backgroundColor: '#00D632', // CashApp Green
+                  color: 'white',
+                  borderRadius: '16px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 10px rgba(0, 214, 50, 0.2)'
+                }}
+              >
+                <Banknote size={24} />
+                <span>Cash App</span>
+              </a>
+
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 </file>
@@ -1601,6 +2048,250 @@ export default function Navigation() {
 }
 </file>
 
+<file path="app/praise-db.json">
+[
+  {
+    "id": 1768057826609,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "🚀 🥂",
+    "message": "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽",
+    "submittedAt": "2026-01-10T15:10:26.609Z"
+  }
+]
+</file>
+
+<file path="package.json">
+{
+  "name": "212mayst",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.562.0",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="app/common-room/page.tsx">
+/**
+ * file: app/common-room/page.tsx
+ * description: Posts now display date in mm/dd/yyyy format + time.
+ */
+
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2 } from 'lucide-react';
+import { addPost, getPosts, editPost, deletePost, Post } from '../actions';
+import Link from 'next/link';
+
+const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
+const MAX_CHARS = 250;
+
+export default function CommonRoom() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [message, setMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [saveLoading, setSaveLoading] = useState(false);
+  
+  const [authorName, setAuthorName] = useState("Guest");
+  const [isGuest, setIsGuest] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false); 
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      const data = await getPosts();
+      setPosts(data);
+    };
+    loadPosts();
+
+    const storedUser = sessionStorage.getItem('212user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setAuthorName(user.alias || user.firstName);
+      setIsGuest(false);
+      if (user.alias === 'idongcodes') setIsAdmin(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; 
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; 
+    }
+  }, [message]);
+
+  useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
+
+  const handleCameraClick = () => cameraInputRef.current?.click();
+  const handleUploadClick = () => uploadInputRef.current?.click();
+  const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
+  
+  const handlePostSubmit = async () => {
+    if (!message.trim()) return;
+    setLoading(true);
+    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0 };
+    setPosts([newPost, ...posts]);
+    setMessage("");
+    setShowEmojiPicker(false);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    await addPost(newPost);
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
+
+  const isEditable = (post: Post) => {
+    if ((post.editCount || 0) >= 1) return false;
+    return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000;
+  };
+
+  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); };
+  const cancelEditing = () => { setEditingId(null); setEditText(""); };
+  
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    setSaveLoading(true);
+    const result = await editPost(editingId, editText.trim());
+    if (result.success) {
+      setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p));
+      setEditingId(null); setEditText("");
+    } else {
+      alert(result.message); setEditingId(null);
+    }
+    setSaveLoading(false);
+  };
+
+  const handleDeletePost = async (id: number) => {
+    if (!confirm("Admin: Delete this post?")) return;
+    setPosts(posts.filter(p => p.id !== id));
+    await deletePost(id);
+  };
+
+  // UPDATED DATE FORMATTER
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    // mm/dd/yyyy, hh:mm am/pm
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        
+        {/* Header & Input UI (Unchanged) */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
+            {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
+          </h1>
+          {isGuest ? <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p> : <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>}
+        </div>
+
+        <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
+              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
+              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
+              {showEmojiPicker && (
+                <>
+                  <div onClick={() => setShowEmojiPicker(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 40, cursor: 'default' }} />
+                  <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}
+                  </div>
+                </>
+              )}
+            </div>
+            <button onClick={handlePostSubmit} disabled={loading} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
+          </div>
+          <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
+            <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><Camera size={24} /></div>
+            <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><ImageIcon size={24} /></div>
+          </div>
+          <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" hidden />
+          <input type="file" ref={uploadInputRef} accept="image/*" hidden />
+        </div>
+
+        {/* Feed with new Date Format */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {posts.map((post) => (
+            <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
+              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <User size={20} color="#0284c7" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      {formatDate(post.timestamp)}
+                      {(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {!editingId && post.author === authorName && isEditable(post) && (
+                      <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>
+                    )}
+                    {isAdmin && (
+                      <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>
+                    )}
+                  </div>
+                </div>
+                {editingId === post.id ? (
+                  <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
+                    <button onClick={saveEdit} disabled={saveLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#171717' }}><Check size={16} /></button>
+                    <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                )}
+              </div>
+            </div>
+          ))}
+          {posts.length === 0 && (<div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No posts yet. Be the first to say hi! 👋</div>)}
+        </div>
+      </div>
+    </main>
+  );
+}
+</file>
+
 <file path="app/actions.ts">
 /**
  * file: app/actions.ts
@@ -1619,12 +2310,13 @@ import { revalidatePath } from "next/cache";
 
 const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
 
-type Praise = {
+export type Praise = {
   id: number;
   name: string;
   role: string;
   subject: string;
   message: string;
+  submittedAt?: string;
 };
 
 const PRAISE_SEED_DATA: Praise[] = [
@@ -1650,10 +2342,26 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const praises = await getPraises();
+
+  // Ensure timestamp is present
+  const praiseWithDate = {
+    ...newPraise,
+    submittedAt: newPraise.submittedAt || new Date().toISOString()
+  };
+
   const updatedPraises = [newPraise, ...praises];
   await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
   revalidatePath("/"); // Refresh Home page
   return updatedPraises;
+}
+
+// DELETE PRAISE (Admin)
+export async function deletePraise(id: number) {
+  const praises = await getPraises();
+  const updated = praises.filter(p => p.id !== id);
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/");
+  return updated;
 }
 
 
@@ -1670,6 +2378,7 @@ export type Feedback = {
   subject: string;
   message: string;
   submittedAt: string;
+  read?: boolean; // Track read status
 };
 
 export async function getFeedback(): Promise<Feedback[]> {
@@ -1683,7 +2392,27 @@ export async function getFeedback(): Promise<Feedback[]> {
 
 export async function addFeedback(newFeedback: Feedback) {
   const list = await getFeedback();
-  const updated = [newFeedback, ...list];
+  // Ensure new feedback starts as unread
+  const feedbackWithStatus = { ...newFeedback, read: false };
+  const updated = [feedbackWithStatus, ...list];
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// DELETE FEEDBACK (Admin)
+export async function deleteFeedback(id: number) {
+  const list = await getFeedback();
+  const updated = list.filter(f => f.id !== id);
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback");
+  return updated;
+}
+
+// TOGGLE READ STATUS (Admin)
+export async function toggleFeedbackRead(id: number, isRead: boolean) {
+  const list = await getFeedback();
+  const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
   await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
   revalidatePath("/feedback");
   return updated;
@@ -1701,6 +2430,7 @@ export type User = {
   firstName: string;
   lastName: string;
   alias?: string; // Optional alias
+  dob?: string;
   role: string;
   phone: string;
   joinedAt: string;
@@ -1734,7 +2464,8 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     id: Date.now(),
     firstName: formData.firstName,
     lastName: formData.lastName,
-    alias: formData.alias || "", // Default to empty string if undefined
+    alias: formData.alias || "",
+    dob: formData.dob, 
     role: formData.role,
     phone: formData.phone,
     joinedAt: new Date().toISOString()
@@ -1742,10 +2473,6 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
 
   // 3. Save to DB
   const users = await getUsers();
-  
-  // Optional: Check if phone already exists? 
-  // For now, we allow duplicates or assume unique phones.
-  
   const updatedUsers = [...users, newUser];
   await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
   
@@ -1762,8 +2489,6 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
 
   // 2. Find User by Phone
   const users = await getUsers();
-  
-  // Clean phone input if needed (optional), currently doing exact match
   const user = users.find(u => u.phone === phone);
 
   if (!user) {
@@ -1831,571 +2556,28 @@ export async function editPost(postId: number, newContent: string) {
   // CHECK 2: Time Limit (15 mins)
   const postTime = new Date(post.timestamp).getTime();
   const now = Date.now();
-  const timeDiff = now - postTime;
   const fifteenMinutes = 15 * 60 * 1000;
 
-  if (timeDiff > fifteenMinutes) {
+  if ((now - postTime) > fifteenMinutes) {
     return { success: false, message: "⏳ Time's up! You can only edit posts within 15 minutes." };
   }
 
   // Apply Update
   posts[postIndex].content = newContent;
-  posts[postIndex].editCount = currentEdits + 1; // Increment count
+  posts[postIndex].editCount = currentEdits + 1; 
   
   await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
   revalidatePath("/common-room");
   return { success: true };
 }
-</file>
 
-<file path="app/common-room/page.tsx">
-/**
- * file: app/common-room/page.tsx
- * description: Updated to read user identity from sessionStorage.
- */
-
-"use client";
-
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check } from 'lucide-react';
-import { addPost, getPosts, editPost, Post } from '../actions';
-import Link from 'next/link';
-
-const COMMON_EMOJIS = [
-  "😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔",
-  "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", 
-  "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋",
-  "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"
-];
-
-const MAX_CHARS = 250;
-
-export default function CommonRoom() {
-  // ... (State declarations same as before)
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [message, setMessage] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [loading, setLoading] = useState(false);
-  
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editText, setEditText] = useState("");
-  const [saveLoading, setSaveLoading] = useState(false);
-  
-  const [authorName, setAuthorName] = useState("Guest");
-  const [isGuest, setIsGuest] = useState(true);
-  
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const uploadInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const loadPosts = async () => {
-      const data = await getPosts();
-      setPosts(data);
-    };
-    loadPosts();
-
-    // CHANGED: Check sessionStorage instead of localStorage
-    const storedUser = sessionStorage.getItem('212user');
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setAuthorName(user.alias || user.firstName);
-      setIsGuest(false);
-    }
-  }, []);
-
-  // ... (Rest of the component remains exactly the same, omitted for brevity) ...
-
-  // Auto-resize textarea when message changes
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; 
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; 
-    }
-  }, [message]);
-
-  useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-    }
-  }, [editingId]);
-
-  const handleCameraClick = () => cameraInputRef.current?.click();
-  const handleUploadClick = () => uploadInputRef.current?.click();
-
-  const handleEmojiClick = (emoji: string) => {
-    if (message.length + emoji.length <= MAX_CHARS) {
-      setMessage(prev => prev + emoji);
-    }
-  };
-
-  const handlePostSubmit = async () => {
-    if (!message.trim()) return;
-
-    setLoading(true);
-    const newPost: Post = {
-      id: Date.now(),
-      author: authorName,
-      content: message.trim(),
-      timestamp: new Date().toISOString(),
-      editCount: 0
-    };
-
-    setPosts([newPost, ...posts]);
-    setMessage("");
-    setShowEmojiPicker(false);
-    
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
-    await addPost(newPost);
-    setLoading(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); 
-      handlePostSubmit();
-    }
-  };
-
-  const isEditable = (post: Post) => {
-    if ((post.editCount || 0) >= 1) return false;
-    const postTime = new Date(post.timestamp).getTime();
-    const fifteenMinutes = 15 * 60 * 1000;
-    return (Date.now() - postTime) < fifteenMinutes;
-  };
-
-  const startEditing = (post: Post) => {
-    setEditingId(post.id);
-    setEditText(post.content);
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditText("");
-  };
-
-  const saveEdit = async () => {
-    if (!editingId || !editText.trim()) return;
-    
-    setSaveLoading(true);
-    const result = await editPost(editingId, editText.trim());
-    
-    if (result.success) {
-      setPosts(posts.map(p => 
-        p.id === editingId 
-          ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } 
-          : p
-      ));
-      setEditingId(null);
-      setEditText("");
-    } else {
-      alert(result.message);
-      setEditingId(null);
-    }
-    setSaveLoading(false);
-  };
-
-  const formatDate = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  return (
-    <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
-            {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
-          </h1>
-          {isGuest ? (
-            <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p>
-          ) : (
-            <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>
-          )}
-        </div>
-
-        <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-            <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
-              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
-              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
-              {showEmojiPicker && (
-                <>
-                  <div onClick={() => setShowEmojiPicker(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 40, cursor: 'default' }} />
-                  <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {COMMON_EMOJIS.map((emoji) => (
-                      <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <button onClick={handlePostSubmit} disabled={loading} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
-          </div>
-          <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
-            <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><Camera size={24} /></div>
-            <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><ImageIcon size={24} /></div>
-          </div>
-          <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" hidden />
-          <input type="file" ref={uploadInputRef} accept="image/*" hidden />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {posts.map((post) => (
-            <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <User size={20} color="#0284c7" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
-                  </div>
-                  {!editingId && post.author === authorName && isEditable(post) && (
-                    <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit (One time only, 15m limit)"><Pencil size={16} /></button>
-                  )}
-                </div>
-                {editingId === post.id ? (
-                  <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
-                    <button onClick={saveEdit} disabled={saveLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#171717' }}><Check size={16} /></button>
-                    <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
-                  </div>
-                ) : (
-                  <p style={{ margin: 0, color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
-                )}
-              </div>
-            </div>
-          ))}
-          {posts.length === 0 && (<div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>No posts yet. Be the first to say hi! 👋</div>)}
-        </div>
-      </div>
-    </main>
-  );
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "212mayst",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "lucide-react": "^0.562.0",
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
-</file>
-
-<file path="app/page.tsx">
-"use client"; 
-
-import React, { useState, useEffect, useRef } from "react"; // Added useRef
-import Link from "next/link";
-import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb } from "lucide-react";
-import { getPraises, addPraise, addFeedback } from "./actions";
-
-// --- HELPER COMPONENT: FADE IN ON SCROLL ---
-function FadeInSection({ children }: { children: React.ReactNode }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const domRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        // Only set visible to TRUE (never set back to false, so it stays visible once scrolled past)
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      });
-    });
-    
-    const currentElement = domRef.current;
-    if (currentElement) {
-      observer.observe(currentElement);
-    }
-
-    return () => {
-      if (currentElement) observer.unobserve(currentElement);
-    };
-  }, []);
-
-  return (
-    <div
-      ref={domRef}
-      className={`fade-in-section ${isVisible ? 'is-visible' : ''}`}
-      style={{ width: '100%' }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// --- MAIN PAGE COMPONENT ---
-type Praise = {
-  id: number;
-  name: string;
-  role: string;
-  subject: string;
-  message: string;
-};
-
-export default function Home() {
-  const [praises, setPraises] = useState<Praise[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [praiseForm, setPraiseForm] = useState({
-    name: "", role: "Tenant", subject: "", message: ""
-  });
-
-  const [feedbackForm, setFeedbackForm] = useState({
-    name: "", role: "Tenant", subject: "", message: ""
-  });
-  const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
-
-  useEffect(() => {
-    const loadData = async () => {
-      const data = await getPraises();
-      setPraises(data);
-      setLoading(false);
-    };
-    loadData();
-  }, []);
-
-  const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setPraiseForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFeedbackForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePraiseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!praiseForm.name || !praiseForm.message) return;
-
-    const newPraise = { id: Date.now(), ...praiseForm };
-    setPraises([newPraise, ...praises]); 
-    setPraiseForm({ name: "", role: "Tenant", subject: "", message: "" });
-    await addPraise(newPraise);
-  };
-
-  const handleFeedbackSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!feedbackForm.name || !feedbackForm.message) return;
-
-    setFeedbackStatus("submitting");
-    const newFeedback = {
-        id: Date.now(),
-        ...feedbackForm,
-        submittedAt: new Date().toISOString()
-    };
-    await addFeedback(newFeedback);
-    setFeedbackForm({ name: "", role: "Tenant", subject: "", message: "" });
-    setFeedbackStatus("success");
-    setTimeout(() => setFeedbackStatus("idle"), 3000);
-  };
-
-  return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      
-      {/* HERO SECTION - Wrapped in FadeInSection */}
-      <FadeInSection>
-        <section 
-          style={{
-            position: 'relative',
-            height: '70vh', 
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center', 
-            justifyContent: 'flex-start', 
-            overflow: 'hidden',
-            padding: '0 2rem' 
-          }}
-        >
-          <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-            <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}>
-              <source src="/heroVid.mov" />
-            </video>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)', opacity: 0.8 }} /> 
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)' }} />
-          </div>
-
-          <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
-            <h1 style={{ fontSize: '3.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem', textShadow: '0 5px 5px rgba(0,0,0,0.5)' }}>212 May Street</h1>
-            <p style={{ fontSize: '1.25rem', fontWeight: '500', color: 'white', marginBottom: '2rem', textShadow: '0 3px 3px rgba(0,0,0,0.5)' }}>Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!</p>
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <Link href="/login" className="hero-btn btn-login">Login</Link>
-              <Link href="/join" className="hero-btn btn-join">Join 212 May St</Link>
-            </div>
-          </div>
-        </section>
-      </FadeInSection>
-
-      {/* FEATURES SECTION - Wrapped */}
-      <FadeInSection>
-        <section style={{ backgroundColor: 'var(--sky-blue)', padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
-            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><MessageCircle size={48} /></div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>House Chat</h3>
-              <p style={{ color: 'gray' }}>Stay connected with everyone. Coordinate plans, share updates, or just say hi.</p>
-            </div>
-            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><Calendar size={48} /></div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Events & Plans</h3>
-              <p style={{ color: 'gray' }}>Never miss a house dinner or movie night. check the calendar and join in.</p>
-            </div>
-            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><ClipboardList size={48} /></div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Tasks & Chores</h3>
-              <p style={{ color: 'gray' }}>Keep the house running smoothly. See what needs doing and lend a hand.</p>
-            </div>
-          </div>
-        </section>
-      </FadeInSection>
-
-      {/* PRAISE SECTION - Wrapped */}
-      <FadeInSection>
-        <section style={{ backgroundColor: '#f9fafb', padding: '4rem 1.5rem' }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            
-            {(praises.length > 0 || loading) && (
-              <div style={{ marginBottom: '4rem', background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', padding: '2rem', borderRadius: '20px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ textAlign: 'center', color: 'var(--sandy-brown)', fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}>House Love <span style={{fontSize: '1.5rem'}}>🫶</span></h2>
-                {loading ? <p style={{ textAlign: 'center', color: '#0369a1' }}>Loading love...</p> : (
-                  <div style={{ display: 'grid', gap: '1.5rem' }}>
-                    {praises.map((p) => (
-                      <div key={p.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
-                        <div style={{ marginBottom: '0.5rem' }}><h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717' }}>{p.subject}</h4></div>
-                        <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{p.name}</span><span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-              <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
-              <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
-                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>First Name</label>
-                    <input type="text" name="name" value={praiseForm.name} onChange={handlePraiseChange} placeholder="Jane" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
-                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Role</label>
-                    <select name="role" value={praiseForm.role} onChange={handlePraiseChange} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', backgroundColor: 'white' }}>
-                      <option value="Tenant">Tenant</option>
-                      <option value="Owner">Owner</option>
-                      <option value="First Lady">First Lady</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Subject</label>
-                  <input type="text" name="subject" value={praiseForm.subject} onChange={handlePraiseChange} placeholder="Just saying hi!" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Message</label>
-                  <textarea name="message" value={praiseForm.message} onChange={handlePraiseChange} placeholder="Share your thoughts..." required rows={4} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', fontFamily: 'inherit' }} />
-                </div>
-                <button type="submit" style={{ marginTop: '10px', backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.2s', width: '100%' }}>Send Praise <Send size={18} /></button>
-              </form>
-            </div>
-          </div>
-        </section>
-      </FadeInSection>
-
-      {/* FEEDBACK SECTION - Wrapped */}
-      <FadeInSection>
-        <section style={{ backgroundColor: '#1e293b', padding: '4rem 1.5rem', color: 'white' }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
-              <Bug size={32} color="var(--sandy-brown)" />
-              <Lightbulb size={32} color="var(--sky-blue)" />
-            </div>
-
-            <h3 style={{ textAlign: 'center', fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Help us improve</h3>
-            <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '2rem' }}>
-              Have a feature request, found a bug, or just want to chat? We are listening.
-              <br/>
-              <Link href="/feedback" style={{ color: 'var(--sky-blue)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>View submitted feedback</Link>
-            </p>
-
-            <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
-                  <input type="text" name="name" value={feedbackForm.name} onChange={handleFeedbackChange} placeholder="John" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
-                </div>
-                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Role</label>
-                  <select name="role" value={feedbackForm.role} onChange={handleFeedbackChange} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }}>
-                    <option value="Tenant">Tenant</option>
-                    <option value="Landlord">Landlord</option>
-                    <option value="First Lady">First Lady</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Subject</label>
-                <input type="text" name="subject" value={feedbackForm.subject} onChange={handleFeedbackChange} placeholder="Feature Request: Dark Mode" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Message</label>
-                <textarea name="message" value={feedbackForm.message} onChange={handleFeedbackChange} placeholder="Tell us what's on your mind..." required rows={4} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem', fontFamily: 'inherit' }} />
-              </div>
-              <button type="submit" disabled={feedbackStatus === "submitting" || feedbackStatus === "success"} style={{ backgroundColor: feedbackStatus === "success" ? 'var(--light-green)' : 'var(--sky-blue)', color: feedbackStatus === "success" ? '#171717' : 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', opacity: feedbackStatus === "submitting" ? 0.7 : 1 }}>
-                {feedbackStatus === "submitting" ? "Sending..." : feedbackStatus === "success" ? "Received! Thanks." : "Submit Feedback"}
-              </button>
-            </form>
-          </div>
-        </section>
-      </FadeInSection>
-
-      {/* WHAT'S NEW SECTION - Wrapped */}
-      <FadeInSection>
-        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>What's New?</h2>
-            <p style={{ color: 'gray' }}>Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.</p>
-          </div>
-        </section>
-      </FadeInSection>
-
-    </main>
-  );
+// DELETE POST (Admin)
+export async function deletePost(id: number) {
+  const posts = await getPosts();
+  const updated = posts.filter(p => p.id !== id);
+  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/common-room");
+  return updated;
 }
 </file>
 
@@ -2505,6 +2687,309 @@ a {
 .btn-login:hover {
   background-color: white;
   color: var(--sky-blue); /* Text turns blue on white background */
+}
+</file>
+
+<file path="app/page.tsx">
+/**
+ * file: app/page.tsx
+ * description: Testimonials now show mm/dd/yyyy date + time.
+ */
+
+"use client"; 
+
+import React, { useState, useEffect, useRef } from "react"; 
+import Link from "next/link";
+import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2 } from "lucide-react";
+import { getPraises, addPraise, addFeedback, deletePraise, Praise } from "./actions"; // Import Type
+
+// ... [FadeInSection and Imports] ...
+function FadeInSection({ children }: { children: React.ReactNode }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const domRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => { entries.forEach(entry => { if (entry.isIntersecting) setIsVisible(true); }); });
+    const currentElement = domRef.current;
+    if (currentElement) observer.observe(currentElement);
+    return () => { if (currentElement) observer.unobserve(currentElement); };
+  }, []);
+  return <div ref={domRef} className={`fade-in-section ${isVisible ? 'is-visible' : ''}`} style={{ width: '100%' }}>{children}</div>;
+}
+
+export default function Home() {
+  const [praises, setPraises] = useState<Praise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null); 
+  const [isAdmin, setIsAdmin] = useState(false); 
+
+  const [praiseForm, setPraiseForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
+  const [feedbackForm, setFeedbackForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
+  const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
+
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await getPraises();
+      setPraises(data);
+      setLoading(false);
+
+      const storedUser = sessionStorage.getItem('212user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (parsedUser.alias === 'idongcodes') setIsAdmin(true);
+        setPraiseForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
+        setFeedbackForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
+      }
+    };
+    loadData();
+  }, []);
+
+  // ... [Handlers: handlePraiseChange, handleFeedbackChange, handlePraiseSubmit, handleDeletePraise, handleFeedbackSubmit] ...
+  const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setPraiseForm(prev => ({ ...prev, [name]: value }));
+  };
+  const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFeedbackForm(prev => ({ ...prev, [name]: value }));
+  };
+  const handlePraiseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!praiseForm.name || !praiseForm.message) return;
+    const newPraise = { id: Date.now(), ...praiseForm, submittedAt: new Date().toISOString() };
+    setPraises([newPraise, ...praises]); 
+    setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
+    await addPraise(newPraise);
+  };
+  const handleDeletePraise = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this praise?")) return;
+    setPraises(praises.filter(p => p.id !== id));
+    await deletePraise(id);
+  };
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackForm.name || !feedbackForm.message) return;
+    setFeedbackStatus("submitting");
+    const newFeedback = { id: Date.now(), ...feedbackForm, submittedAt: new Date().toISOString() };
+    await addFeedback(newFeedback);
+    setFeedbackForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
+    setFeedbackStatus("success");
+    setTimeout(() => setFeedbackStatus("idle"), 3000);
+  };
+
+  // HELPER: Date Formatter
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* HERO & FEATURES SECTIONS (Unchanged, condensed for focus) */}
+      <FadeInSection>
+        <section style={{ position: 'relative', height: '70vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', padding: '0 2rem' }}>
+          <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+            <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}><source src="/heroVid.mov" /></video>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)', opacity: 0.8 }} /> 
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)' }} />
+          </div>
+          <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
+            <h1 style={{ fontSize: '3.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem', textShadow: '0 5px 5px rgba(0,0,0,0.5)' }}>212 May Street</h1>
+            <p style={{ fontSize: '1.25rem', fontWeight: '500', color: 'white', marginBottom: '2rem', textShadow: '0 3px 3px rgba(0,0,0,0.5)' }}>Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!</p>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <Link href="/login" className="hero-btn btn-login">Login</Link>
+              <Link href="/join" className="hero-btn btn-join">Join 212 May St</Link>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      <FadeInSection>
+        <section style={{ backgroundColor: 'var(--sky-blue)', padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><MessageCircle size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>House Chat</h3>
+              <p style={{ color: 'gray' }}>Stay connected with everyone. Coordinate plans, share updates, or just say hi.</p>
+            </div>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><Calendar size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Events & Plans</h3>
+              <p style={{ color: 'gray' }}>Never miss a house dinner or movie night. check the calendar and join in.</p>
+            </div>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><ClipboardList size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Tasks & Chores</h3>
+              <p style={{ color: 'gray' }}>Keep the house running smoothly. See what needs doing and lend a hand.</p>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* PRAISE SECTION */}
+      <FadeInSection>
+        <section style={{ backgroundColor: '#f9fafb', padding: '4rem 1.5rem' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            
+            {(praises.length > 0 || loading) && (
+              <div style={{ marginBottom: '4rem', background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', padding: '2rem', borderRadius: '20px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ textAlign: 'center', color: 'var(--sandy-brown)', fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}>House Love <span style={{fontSize: '1.5rem'}}>🫶</span></h2>
+                {loading ? <p style={{ textAlign: 'center', color: '#0369a1' }}>Loading love...</p> : (
+                  <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    {praises.map((p) => (
+                      <div key={p.id} style={{ position: 'relative', backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
+                        
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeletePraise(p.id)}
+                            style={{ position: 'absolute', top: '10px', right: '10px', background: 'white', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
+                            title="Delete Praise (Admin)"
+                          >
+                            <Trash2 size={16} color="#ef4444" />
+                          </button>
+                        )}
+
+                        <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717', margin: 0 }}>{p.subject}</h4>
+                          
+                          {/* DATE DISPLAY */}
+                          {p.submittedAt && (
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '10px' }}>
+                              {formatDate(p.submittedAt)}
+                            </span>
+                          )}
+                        </div>
+
+                        <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{user ? p.name : "Housemate"}</span>
+                            <span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+              <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
+              
+              {!user ? (
+                <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '2px dashed #e2e8f0', color: '#94a3b8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}><Lock size={32} color="#cbd5e1" /></div>
+                  <p style={{ fontSize: '1rem' }}>You must be <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>logged in</Link> to leave praise.</p>
+                </div>
+              ) : (
+                <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>First Name</label>
+                      <input type="text" name="name" value={praiseForm.name} onChange={handlePraiseChange} placeholder="Jane" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Role</label>
+                      <select name="role" value={praiseForm.role} onChange={handlePraiseChange} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', backgroundColor: 'white' }}>
+                        <option value="Tenant">Tenant</option>
+                        <option value="Owner">Owner</option>
+                        <option value="First Lady">First Lady</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Subject</label>
+                    <input type="text" name="subject" value={praiseForm.subject} onChange={handlePraiseChange} placeholder="Just saying hi!" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Message</label>
+                    <textarea name="message" value={praiseForm.message} onChange={handlePraiseChange} placeholder="Share your thoughts..." required rows={4} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', fontFamily: 'inherit' }} />
+                  </div>
+                  <button type="submit" style={{ marginTop: '10px', backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.2s', width: '100%' }}>Send Praise <Send size={18} /></button>
+                </form>
+              )}
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* FEEDBACK SECTION */}
+      <FadeInSection>
+        <section style={{ backgroundColor: '#1e293b', padding: '4rem 1.5rem', color: 'white' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
+              <Bug size={32} color="var(--sandy-brown)" />
+              <Lightbulb size={32} color="var(--sky-blue)" />
+            </div>
+
+            <h3 style={{ textAlign: 'center', fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Help us improve</h3>
+            <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '2rem' }}>
+              Have a feature request, found a bug, or just want to chat? We are listening.
+              <br/>
+              <Link href="/feedback" style={{ color: 'var(--sky-blue)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>View submitted feedback</Link>
+            </p>
+
+            {!user ? (
+              <div style={{ backgroundColor: '#334155', padding: '3rem', borderRadius: '20px', textAlign: 'center', border: '1px dashed #475569', color: '#94a3b8' }}>
+                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}><Lock size={32} color="#64748b" /></div>
+                 <p style={{ fontSize: '1rem' }}>Please <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>log in</Link> to submit feedback.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
+                {/* ... (Feedback Form inputs unchanged) ... */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
+                    <input type="text" name="name" value={feedbackForm.name} onChange={handleFeedbackChange} placeholder="John" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Role</label>
+                    <select name="role" value={feedbackForm.role} onChange={handleFeedbackChange} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }}>
+                      <option value="Tenant">Tenant</option>
+                      <option value="Landlord">Landlord</option>
+                      <option value="First Lady">First Lady</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Subject</label>
+                  <input type="text" name="subject" value={feedbackForm.subject} onChange={handleFeedbackChange} placeholder="Feature Request: Dark Mode" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Message</label>
+                  <textarea name="message" value={feedbackForm.message} onChange={handleFeedbackChange} placeholder="Tell us what's on your mind..." required rows={4} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem', fontFamily: 'inherit' }} />
+                </div>
+                <button type="submit" disabled={feedbackStatus === "submitting" || feedbackStatus === "success"} style={{ backgroundColor: feedbackStatus === "success" ? 'var(--light-green)' : 'var(--sky-blue)', color: feedbackStatus === "success" ? '#171717' : 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', opacity: feedbackStatus === "submitting" ? 0.7 : 1 }}>
+                  {feedbackStatus === "submitting" ? "Sending..." : feedbackStatus === "success" ? "Received! Thanks." : "Submit Feedback"}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      </FadeInSection>
+      
+      <FadeInSection>
+        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>What's New?</h2>
+            <p style={{ color: 'gray' }}>Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.</p>
+          </div>
+        </section>
+      </FadeInSection>
+
+    </main>
+  );
 }
 </file>
 
