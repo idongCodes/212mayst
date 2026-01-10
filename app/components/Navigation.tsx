@@ -1,6 +1,6 @@
 /**
  * file: app/components/Navigation.tsx
- * description: Added logic to auto-open Chat Popup when navigating away from /chat.
+ * description: Chat Popup now displays real profile pictures from registered users.
  */
 
 "use client";
@@ -9,22 +9,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { addChat, getChats, ChatMessage } from "../actions";
+import { addChat, getChats, ChatMessage, getUsers, User } from "../actions"; // Import getUsers
 
-const COMMON_EMOJIS = [
-  "😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔",
-  "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", 
-  "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"
-];
-
-const MOCK_GIFS = [
-  { id: 1, label: "Hi!", color: "#fca5a5" },
-  { id: 2, label: "Party", color: "#fcd34d" },
-  { id: 3, label: "No", color: "#86efac" },
-  { id: 4, label: "Love", color: "#93c5fd" },
-  { id: 5, label: "Sad", color: "#d8b4fe" },
-  { id: 6, label: "Yes", color: "#fda4af" },
-];
+// ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
+const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
+const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -34,8 +23,6 @@ export default function Navigation() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   
   const isChatPage = pathname === "/chat"; 
-
-  // Track previous path to detect when we leave /chat
   const prevPathRef = useRef(pathname);
 
   // Chat State
@@ -43,6 +30,7 @@ export default function Navigation() {
   const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "Base64Pic"
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -62,20 +50,34 @@ export default function Navigation() {
     checkLogin();
   }, [pathname]);
 
-  // 2. Auto-Open Chat when leaving /chat
+  // 2. Fetch User Avatars
   useEffect(() => {
-    // If we just left the chat page, open the popup
+    if (isLoggedIn) {
+      getUsers().then(users => {
+        const map: Record<string, string> = {};
+        users.forEach(u => {
+          // Map both real name and alias to the profile pic
+          if (u.profilePic) {
+            map[u.firstName] = u.profilePic;
+            if (u.alias) map[u.alias] = u.profilePic;
+          }
+        });
+        setUserMap(map);
+      });
+    }
+  }, [isLoggedIn]);
+
+  // 3. Auto-Open Chat logic
+  useEffect(() => {
     if (prevPathRef.current === "/chat" && pathname !== "/chat") {
       setIsChatOpen(true);
     }
-    // Update ref for next change
     prevPathRef.current = pathname;
   }, [pathname]);
 
-  // 3. Polling
+  // 4. Polling
   useEffect(() => {
     if (!isChatOpen) return;
-
     const fetchMessages = async () => { 
       const serverMessages = await getChats(); 
       setMessages(current => {
@@ -85,13 +87,12 @@ export default function Navigation() {
         return current;
       });
     };
-
     fetchMessages();
     const interval = setInterval(fetchMessages, 2000);
     return () => clearInterval(interval);
   }, [isChatOpen]);
 
-  // 4. Scroll Logic
+  // 5. Scroll Logic
   const handleScroll = () => {
     if (!chatContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
@@ -99,18 +100,13 @@ export default function Navigation() {
     setIsNearBottom(distanceFromBottom < 100);
   };
 
-  // 5. Smart Auto-Scroll
   useEffect(() => { 
     if (isNearBottom && isChatOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isChatOpen, isNearBottom]);
 
-  const handleLogout = () => { 
-    sessionStorage.removeItem('212user'); 
-    setIsLoggedIn(false); 
-    router.push('/'); 
-  };
+  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
@@ -118,11 +114,8 @@ export default function Navigation() {
     setMessageText(""); setShowEmojiPicker(false); setShowGifPicker(false);
     
     const authorName = currentUser.alias || currentUser.firstName;
-    
-    // Optimistic Update
     setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
     
-    // Force scroll
     setIsNearBottom(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
@@ -168,7 +161,7 @@ export default function Navigation() {
         )}
       </nav>
 
-      {/* CHAT SYSTEM - Only show if Logged In AND NOT on the full chat page */}
+      {/* CHAT POPUP */}
       {isLoggedIn && !isChatPage && (
         <>
           {isChatOpen && (
@@ -200,9 +193,29 @@ export default function Navigation() {
                 ) : (
                   messages.map((msg) => {
                     const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
+                    const avatarSrc = userMap[msg.author];
+
                     return (
                       <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', color: isMe ? '#0284c7' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)' }}>{getInitial(msg.author)}</div>
+                        
+                        {/* AVATAR */}
+                        <div style={{ 
+                          width: '28px', height: '28px', borderRadius: '50%', 
+                          backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', 
+                          color: isMe ? '#0284c7' : '#64748b',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.75rem', fontWeight: 'bold',
+                          flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)',
+                          overflow: 'hidden' 
+                        }}>
+                          {avatarSrc ? (
+                            <img src={avatarSrc} alt={msg.author} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            getInitial(msg.author)
+                          )}
+                        </div>
+
+                        {/* MESSAGE */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                           {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px' }}>{msg.author}</div>}
                           <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
@@ -214,7 +227,7 @@ export default function Navigation() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* INPUT AREA */}
+              {/* INPUT AREA (Same as before) */}
               {showEmojiPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
               {showGifPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}</div>}
               <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>
