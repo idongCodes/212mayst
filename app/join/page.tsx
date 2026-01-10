@@ -1,6 +1,6 @@
 /**
  * file: app/join/page.tsx
- * description: Registration form with Profile Picture upload.
+ * description: Reverted heading texts to original. Profile pic input remains.
  */
 
 "use client";
@@ -23,9 +23,10 @@ export default function Join() {
     role: "Tenant",
     phone: "",
     doorCode: "",
-    profilePic: "" // <--- Base64 string
+    profilePic: ""
   });
   
+  const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -38,10 +39,10 @@ export default function Join() {
     }
   };
 
-  // Handle Image Upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, profilePic: reader.result as string }));
@@ -73,43 +74,33 @@ export default function Join() {
       
       <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
         
+        {/* HEADER: Reverted Texts */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ 
+            width: '80px', height: '80px', margin: '0 auto 1rem auto', 
+            backgroundColor: status === 'success' ? 'var(--light-green)' : 'var(--sandy-brown)', 
+            borderRadius: '50%', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 10px 25px rgba(244, 164, 96, 0.4)',
+            transition: 'background-color 0.5s'
+          }}>
+            <ShieldCheck size={40} color={status === 'success' ? '#171717' : 'white'} />
+          </div>
           <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>Join the House</h1>
-          <p style={{ color: '#64748b' }}>Create your profile.</p>
+          <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
         </div>
 
-        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0' }}>
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '2rem', 
+          borderRadius: '24px', 
+          boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
+          border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0',
+          transition: 'border-color 0.3s'
+        }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
-            {/* PROFILE PIC UPLOADER */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                style={{ 
-                  width: '100px', height: '100px', borderRadius: '50%', 
-                  backgroundColor: '#f1f5f9', border: '2px dashed #cbd5e1',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', overflow: 'hidden', position: 'relative'
-                }}
-              >
-                {formData.profilePic ? (
-                  <img src={formData.profilePic} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ textAlign: 'center', color: '#94a3b8' }}>
-                    <Camera size={24} style={{ margin: '0 auto 4px auto' }} />
-                    <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Add Photo</span>
-                  </div>
-                )}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*" 
-                  style={{ display: 'none' }} 
-                />
-              </div>
-            </div>
-
+            {/* Name Fields */}
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
@@ -124,6 +115,29 @@ export default function Join() {
               </div>
             </div>
 
+            {/* Profile Picture */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Profile Picture</label>
+              <div style={{ position: 'relative' }}>
+                <Camera size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  readOnly 
+                  placeholder={fileName || "Tap to upload photo"} 
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', cursor: 'pointer', backgroundColor: 'white', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }} 
+                />
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                />
+              </div>
+            </div>
+
+            {/* Alias */}
             <div>
                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
                  <span>Alias <span style={{fontWeight: 'normal', color: '#94a3b8'}}>(Optional)</span></span>
@@ -134,6 +148,7 @@ export default function Join() {
                </div>
             </div>
 
+            {/* DOB */}
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Date of Birth</label>
               <div style={{ position: 'relative' }}>
@@ -142,6 +157,7 @@ export default function Join() {
               </div>
             </div>
 
+            {/* Role */}
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Role</label>
               <div style={{ position: 'relative' }}>
@@ -154,6 +170,7 @@ export default function Join() {
               </div>
             </div>
 
+            {/* Phone */}
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Phone Number</label>
               <div style={{ position: 'relative' }}>
@@ -162,6 +179,7 @@ export default function Join() {
               </div>
             </div>
 
+            {/* Door Code */}
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Door Code</label>
               <div style={{ position: 'relative' }}>
