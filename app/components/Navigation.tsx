@@ -1,6 +1,6 @@
 /**
  * file: app/components/Navigation.tsx
- * description: Chat Popup with profile avatars next to messages.
+ * description: Added logic to auto-open Chat Popup when navigating away from /chat.
  */
 
 "use client";
@@ -33,13 +33,22 @@ export default function Navigation() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   
+  const isChatPage = pathname === "/chat"; 
+
+  // Track previous path to detect when we leave /chat
+  const prevPathRef = useRef(pathname);
+
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
 
+  // 1. Auth & Login Check
   useEffect(() => {
     const checkLogin = () => {
       const storedUser = sessionStorage.getItem('212user');
@@ -53,85 +62,94 @@ export default function Navigation() {
     checkLogin();
   }, [pathname]);
 
+  // 2. Auto-Open Chat when leaving /chat
+  useEffect(() => {
+    // If we just left the chat page, open the popup
+    if (prevPathRef.current === "/chat" && pathname !== "/chat") {
+      setIsChatOpen(true);
+    }
+    // Update ref for next change
+    prevPathRef.current = pathname;
+  }, [pathname]);
+
+  // 3. Polling
   useEffect(() => {
     if (!isChatOpen) return;
-    const fetchMessages = async () => {
-      const data = await getChats();
-      setMessages(data);
+
+    const fetchMessages = async () => { 
+      const serverMessages = await getChats(); 
+      setMessages(current => {
+        if (JSON.stringify(current) !== JSON.stringify(serverMessages)) {
+          return serverMessages;
+        }
+        return current;
+      });
     };
+
     fetchMessages();
     const interval = setInterval(fetchMessages, 2000);
     return () => clearInterval(interval);
   }, [isChatOpen]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isChatOpen]);
+  // 4. Scroll Logic
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setIsNearBottom(distanceFromBottom < 100);
+  };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('212user');
-    setIsLoggedIn(false);
-    router.push('/');
+  // 5. Smart Auto-Scroll
+  useEffect(() => { 
+    if (isNearBottom && isChatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isChatOpen, isNearBottom]);
+
+  const handleLogout = () => { 
+    sessionStorage.removeItem('212user'); 
+    setIsLoggedIn(false); 
+    router.push('/'); 
   };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
     const textToSend = messageText.trim();
-    setMessageText("");
-    setShowEmojiPicker(false);
-    setShowGifPicker(false);
-
+    setMessageText(""); setShowEmojiPicker(false); setShowGifPicker(false);
+    
     const authorName = currentUser.alias || currentUser.firstName;
-    const tempMsg = {
-      id: Date.now(),
-      author: authorName,
-      text: textToSend,
-      timestamp: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, tempMsg]);
+    
+    // Optimistic Update
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
+    
+    // Force scroll
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
     await addChat(textToSend, authorName);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSendMessage();
-  };
-
-  const handleEmojiClick = (emoji: string) => {
-    setMessageText(prev => prev + emoji);
-  };
-
-  const handleGifClick = async (label: string) => {
-    if (!currentUser) return;
-    const authorName = currentUser.alias || currentUser.firstName;
-    const gifText = `[GIF: ${label}]`;
-    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]);
-    setShowGifPicker(false);
-    await addChat(gifText, authorName);
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSendMessage(); };
+  const handleEmojiClick = (emoji: string) => { setMessageText(prev => prev + emoji); };
+  
+  const handleGifClick = async (label: string) => { 
+    if (!currentUser) return; 
+    const authorName = currentUser.alias || currentUser.firstName; 
+    const gifText = `[GIF: ${label}]`; 
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    setShowGifPicker(false); 
+    setIsNearBottom(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    await addChat(gifText, authorName); 
   };
 
   const isActive = (path: string) => pathname === path;
-
-  const getLinkStyle = (path: string) => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af',
-    fontWeight: isActive(path) ? 'bold' : 'normal',
-    transition: 'color 0.2s ease', background: 'none', border: 'none', cursor: 'pointer', padding: 0
-  });
-
-  // Helper to get initials
+  const getLinkStyle = (path: string) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive(path) ? 'var(--sandy-brown)' : '#9ca3af', fontWeight: isActive(path) ? 'bold' : 'normal', transition: 'color 0.2s ease', background: 'none', border: 'none', cursor: 'pointer', padding: 0 });
   const getInitial = (name: string) => name ? name.charAt(0).toUpperCase() : "?";
 
   return (
     <>
-      <nav 
-        style={{
-          position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
-          display: 'flex', gap: '20px', alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50px', padding: '12px 25px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-        }}
-      >
+      <nav style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 100, display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50px', padding: '12px 25px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
         <Link href="/" style={getLinkStyle("/")} title="Home"><Home size={24} /></Link>
         {isLoggedIn && (
           <>
@@ -150,8 +168,8 @@ export default function Navigation() {
         )}
       </nav>
 
-      {/* CHAT SYSTEM */}
-      {isLoggedIn && (
+      {/* CHAT SYSTEM - Only show if Logged In AND NOT on the full chat page */}
+      {isLoggedIn && !isChatPage && (
         <>
           {isChatOpen && (
             <div className="animate-fade-in" style={{ position: 'fixed', bottom: '8rem', right: '1rem', width: '320px', height: '450px', backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', zIndex: 101, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
@@ -169,7 +187,11 @@ export default function Navigation() {
               </div>
 
               {/* MESSAGES AREA */}
-              <div style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div 
+                ref={chatContainerRef}
+                onScroll={handleScroll}
+                style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}
+              >
                 {messages.length === 0 ? (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
                     <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '1rem' }}><MessageCircle size={32} color="var(--sandy-brown)" /></div>
@@ -178,41 +200,13 @@ export default function Navigation() {
                 ) : (
                   messages.map((msg) => {
                     const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
-                    
                     return (
                       <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                        
-                        {/* PROFILE AVATAR */}
-                        <div style={{ 
-                          width: '28px', height: '28px', borderRadius: '50%', 
-                          backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', // Light blue for me, gray for others
-                          color: isMe ? '#0284c7' : '#64748b',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.75rem', fontWeight: 'bold',
-                          flexShrink: 0,
-                          border: '1px solid rgba(0,0,0,0.05)'
-                        }}>
-                          {getInitial(msg.author)}
-                        </div>
-
-                        {/* MESSAGE CONTENT */}
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', color: isMe ? '#0284c7' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)' }}>{getInitial(msg.author)}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                           {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px' }}>{msg.author}</div>}
-                          <div style={{
-                            backgroundColor: isMe ? 'var(--sandy-brown)' : 'white',
-                            color: isMe ? 'white' : '#334155',
-                            padding: '8px 12px',
-                            borderRadius: '16px',
-                            borderTopRightRadius: isMe ? '4px' : '16px',
-                            borderTopLeftRadius: isMe ? '16px' : '4px',
-                            fontSize: '0.9rem',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                            wordWrap: 'break-word'
-                          }}>
-                            {msg.text}
-                          </div>
+                          <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
                         </div>
-
                       </div>
                     );
                   })
@@ -220,19 +214,9 @@ export default function Navigation() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* PICKER OVERLAYS (Unchanged) */}
-              {showEmojiPicker && (
-                <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>
-                  {COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}
-                </div>
-              )}
-              {showGifPicker && (
-                <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  {MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}
-                </div>
-              )}
-
-              {/* UNIFIED INPUT AREA (Unchanged) */}
+              {/* INPUT AREA */}
+              {showEmojiPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
+              {showGifPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}</div>}
               <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>
                 <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '4px', paddingLeft: '12px' }}>
                   <input type="text" placeholder="Type a message..." value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={handleKeyDown} style={{ flex: 1, padding: '8px 0', background: 'transparent', border: 'none', outline: 'none', fontSize: '0.9rem', color: '#1e293b', minWidth: 0 }} />
@@ -243,7 +227,6 @@ export default function Navigation() {
                   </div>
                 </div>
               </div>
-
             </div>
           )}
 
