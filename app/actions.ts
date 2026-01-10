@@ -141,6 +141,7 @@ export type User = {
   role: string;
   phone: string;
   joinedAt: string;
+  profilePic?: string;
 };
 
 // Response type for Auth actions
@@ -175,6 +176,7 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     dob: formData.dob, 
     role: formData.role,
     phone: formData.phone,
+    profilePic: formData.profilePic || "",
     joinedAt: new Date().toISOString()
   };
 
