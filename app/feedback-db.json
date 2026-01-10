@@ -1,26 +1,11 @@
 [
   {
-    "id": 1768051669770,
-    "name": "hjgkj",
-    "role": "Tenant",
-    "subject": "kjkjlhkj",
-    "message": "hjgkhg",
-    "submittedAt": "2026-01-10T13:27:49.770Z"
-  },
-  {
-    "id": 1768051621376,
-    "name": "Idong",
-    "role": "Tenant",
-    "subject": "hgk",
-    "message": "hjkjg",
-    "submittedAt": "2026-01-10T13:27:01.376Z"
-  },
-  {
     "id": 1767915877558,
     "name": "Idong",
     "role": "Tenant",
     "subject": "Chat Feature ?",
     "message": "I'd love a real time chat feature !",
-    "submittedAt": "2026-01-08T23:44:37.558Z"
+    "submittedAt": "2026-01-08T23:44:37.558Z",
+    "read": false
   }
 ]

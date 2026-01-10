@@ -1,14 +1,14 @@
 /**
  * file: app/page.tsx
- * description: Home/Dashboard page with authentication restrictions on Praise and Feedback forms.
+ * description: Home page. Hides testimonial names for unauthenticated users.
  */
 
 "use client"; 
 
 import React, { useState, useEffect, useRef } from "react"; 
 import Link from "next/link";
-import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock } from "lucide-react";
-import { getPraises, addPraise, addFeedback } from "./actions";
+import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2 } from "lucide-react";
+import { getPraises, addPraise, addFeedback, deletePraise } from "./actions"; 
 
 // --- HELPER COMPONENT: FADE IN ON SCROLL ---
 function FadeInSection({ children }: { children: React.ReactNode }) {
@@ -18,34 +18,17 @@ function FadeInSection({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
+        if (entry.isIntersecting) setIsVisible(true);
       });
     });
-    
     const currentElement = domRef.current;
-    if (currentElement) {
-      observer.observe(currentElement);
-    }
-
-    return () => {
-      if (currentElement) observer.unobserve(currentElement);
-    };
+    if (currentElement) observer.observe(currentElement);
+    return () => { if (currentElement) observer.unobserve(currentElement); };
   }, []);
 
-  return (
-    <div
-      ref={domRef}
-      className={`fade-in-section ${isVisible ? 'is-visible' : ''}`}
-      style={{ width: '100%' }}
-    >
-      {children}
-    </div>
-  );
+  return <div ref={domRef} className={`fade-in-section ${isVisible ? 'is-visible' : ''}`} style={{ width: '100%' }}>{children}</div>;
 }
 
-// --- MAIN PAGE COMPONENT ---
 type Praise = {
   id: number;
   name: string;
@@ -57,30 +40,28 @@ type Praise = {
 export default function Home() {
   const [praises, setPraises] = useState<Praise[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null); // Track User Session
+  const [user, setUser] = useState<any>(null); 
+  const [isAdmin, setIsAdmin] = useState(false); 
 
-  const [praiseForm, setPraiseForm] = useState({
-    name: "", role: "Tenant", subject: "", message: ""
-  });
-
-  const [feedbackForm, setFeedbackForm] = useState({
-    name: "", role: "Tenant", subject: "", message: ""
-  });
+  const [praiseForm, setPraiseForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
+  const [feedbackForm, setFeedbackForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
   const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
 
   useEffect(() => {
     const loadData = async () => {
-      // Load Praises
       const data = await getPraises();
       setPraises(data);
       setLoading(false);
 
-      // Check Session
       const storedUser = sessionStorage.getItem('212user');
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        // Pre-fill forms with user data if available
+        
+        if (parsedUser.alias === 'idongcodes') {
+          setIsAdmin(true);
+        }
+
         setPraiseForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
         setFeedbackForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
       }
@@ -101,23 +82,23 @@ export default function Home() {
   const handlePraiseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!praiseForm.name || !praiseForm.message) return;
-
     const newPraise = { id: Date.now(), ...praiseForm };
     setPraises([newPraise, ...praises]); 
     setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     await addPraise(newPraise);
   };
 
+  const handleDeletePraise = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this praise?")) return;
+    setPraises(praises.filter(p => p.id !== id));
+    await deletePraise(id);
+  };
+
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackForm.name || !feedbackForm.message) return;
-
     setFeedbackStatus("submitting");
-    const newFeedback = {
-        id: Date.now(),
-        ...feedbackForm,
-        submittedAt: new Date().toISOString()
-    };
+    const newFeedback = { id: Date.now(), ...feedbackForm, submittedAt: new Date().toISOString() };
     await addFeedback(newFeedback);
     setFeedbackForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     setFeedbackStatus("success");
@@ -129,26 +110,12 @@ export default function Home() {
       
       {/* HERO SECTION */}
       <FadeInSection>
-        <section 
-          style={{
-            position: 'relative',
-            height: '70vh', 
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center', 
-            justifyContent: 'flex-start', 
-            overflow: 'hidden',
-            padding: '0 2rem' 
-          }}
-        >
+        <section style={{ position: 'relative', height: '70vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', padding: '0 2rem' }}>
           <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-            <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}>
-              <source src="/heroVid.mov" />
-            </video>
+            <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}><source src="/heroVid.mov" /></video>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)', opacity: 0.8 }} /> 
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)' }} />
           </div>
-
           <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
             <h1 style={{ fontSize: '3.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem', textShadow: '0 5px 5px rgba(0,0,0,0.5)' }}>212 May Street</h1>
             <p style={{ fontSize: '1.25rem', fontWeight: '500', color: 'white', marginBottom: '2rem', textShadow: '0 3px 3px rgba(0,0,0,0.5)' }}>Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!</p>
@@ -194,12 +161,30 @@ export default function Home() {
                 {loading ? <p style={{ textAlign: 'center', color: '#0369a1' }}>Loading love...</p> : (
                   <div style={{ display: 'grid', gap: '1.5rem' }}>
                     {praises.map((p) => (
-                      <div key={p.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
+                      <div key={p.id} style={{ position: 'relative', backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
+                        
+                        {/* ADMIN DELETE BUTTON */}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeletePraise(p.id)}
+                            style={{ position: 'absolute', top: '10px', right: '10px', background: 'white', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
+                            title="Delete Praise (Admin)"
+                          >
+                            <Trash2 size={16} color="#ef4444" />
+                          </button>
+                        )}
+
                         <div style={{ marginBottom: '0.5rem' }}><h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717' }}>{p.subject}</h4></div>
                         <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{p.name}</span><span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span></div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {/* NAME VISIBILITY CHECK: Only show name if logged in */}
+                            <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>
+                              {user ? p.name : "Housemate"}
+                            </span>
+                            <span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -212,17 +197,11 @@ export default function Home() {
               <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
               
               {!user ? (
-                // LOCKED STATE (Light Theme)
                 <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '2px dashed #e2e8f0', color: '#94a3b8' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-                    <Lock size={32} color="#cbd5e1" />
-                  </div>
-                  <p style={{ fontSize: '1rem' }}>
-                    You must be <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>logged in</Link> to leave praise.
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}><Lock size={32} color="#cbd5e1" /></div>
+                  <p style={{ fontSize: '1rem' }}>You must be <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>logged in</Link> to leave praise.</p>
                 </div>
               ) : (
-                // FORM (Authenticated)
                 <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
@@ -271,17 +250,11 @@ export default function Home() {
             </p>
 
             {!user ? (
-              // LOCKED STATE (Dark Theme)
               <div style={{ backgroundColor: '#334155', padding: '3rem', borderRadius: '20px', textAlign: 'center', border: '1px dashed #475569', color: '#94a3b8' }}>
-                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
-                    <Lock size={32} color="#64748b" />
-                 </div>
-                 <p style={{ fontSize: '1rem' }}>
-                   Please <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>log in</Link> to submit feedback.
-                 </p>
+                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}><Lock size={32} color="#64748b" /></div>
+                 <p style={{ fontSize: '1rem' }}>Please <Link href="/login" style={{ color: 'var(--sky-blue)', fontWeight: 'bold', textDecoration: 'underline' }}>log in</Link> to submit feedback.</p>
               </div>
             ) : (
-              // FORM (Authenticated)
               <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                   <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -313,8 +286,8 @@ export default function Home() {
           </div>
         </section>
       </FadeInSection>
-
-      {/* WHAT'S NEW SECTION */}
+      
+      {/* WHAT'S NEW */}
       <FadeInSection>
         <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
