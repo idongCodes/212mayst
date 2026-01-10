@@ -1,6 +1,6 @@
 /**
  * file: app/components/Navigation.tsx
- * description: Chat Popup with Send button moved INSIDE the input container.
+ * description: Chat Popup with persistent messaging, polling, and alignment logic.
  */
 
 "use client";
@@ -8,7 +8,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { addChat, getChats, ChatMessage } from "../actions"; // Import actions
 
 const COMMON_EMOJIS = [
   "😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔",
@@ -30,19 +31,48 @@ export default function Navigation() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Chat State
-  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // 1. Auth Check & Initial Load
   useEffect(() => {
     const checkLogin = () => {
-      const user = sessionStorage.getItem('212user');
-      setIsLoggedIn(!!user);
+      const storedUser = sessionStorage.getItem('212user');
+      if (storedUser) {
+        setIsLoggedIn(true);
+        setCurrentUser(JSON.parse(storedUser));
+      } else {
+        setIsLoggedIn(false);
+      }
     };
     checkLogin();
   }, [pathname]);
+
+  // 2. Poll for new messages when chat is open
+  useEffect(() => {
+    if (!isChatOpen) return;
+
+    const fetchMessages = async () => {
+      const data = await getChats();
+      setMessages(data);
+    };
+
+    fetchMessages(); // Initial fetch
+    const interval = setInterval(fetchMessages, 2000); // Poll every 2s
+
+    return () => clearInterval(interval);
+  }, [isChatOpen]);
+
+  // 3. Auto-scroll to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isChatOpen]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('212user');
@@ -50,13 +80,46 @@ export default function Navigation() {
     router.push('/');
   };
 
-  const handleEmojiClick = (emoji: string) => {
-    setMessage(prev => prev + emoji);
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !currentUser) return;
+
+    const textToSend = messageText.trim();
+    setMessageText(""); // Clear input immediately
+    setShowEmojiPicker(false);
+    setShowGifPicker(false);
+
+    // Optimistic Update (Show immediately)
+    const authorName = currentUser.alias || currentUser.firstName;
+    const tempMsg = {
+      id: Date.now(),
+      author: authorName,
+      text: textToSend,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, tempMsg]);
+
+    // Send to Backend
+    await addChat(textToSend, authorName);
   };
 
-  const handleGifClick = (label: string) => {
-    alert(`Sent GIF: ${label} (Mock Function)`);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSendMessage();
+  };
+
+  const handleEmojiClick = (emoji: string) => {
+    setMessageText(prev => prev + emoji);
+  };
+
+  const handleGifClick = async (label: string) => {
+    if (!currentUser) return;
+    const authorName = currentUser.alias || currentUser.firstName;
+    const gifText = `[GIF: ${label}]`; // Simulating a GIF for now
+    
+    // Optimistic
+    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]);
+    
     setShowGifPicker(false);
+    await addChat(gifText, authorName);
   };
 
   const isActive = (path: string) => pathname === path;
@@ -154,12 +217,39 @@ export default function Navigation() {
                 </div>
               </div>
 
-              {/* CONTENT AREA */}
-              <div style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '1rem' }}>
-                <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                   <MessageCircle size={32} color="var(--sandy-brown)" />
-                </div>
-                <p style={{ margin: 0, textAlign: 'center', fontSize: '0.9rem', lineHeight: '1.5' }}><strong>Quick Chat</strong><br/>Active conversations will appear here.</p>
+              {/* MESSAGES AREA */}
+              <div style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {messages.length === 0 ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                    <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '50%', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '1rem' }}>
+                       <MessageCircle size={32} color="var(--sandy-brown)" />
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>No messages yet.</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
+                    return (
+                      <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                        {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '8px' }}>{msg.author}</div>}
+                        <div style={{
+                          backgroundColor: isMe ? 'var(--sandy-brown)' : 'white',
+                          color: isMe ? 'white' : '#334155',
+                          padding: '8px 12px',
+                          borderRadius: '16px',
+                          borderBottomRightRadius: isMe ? '4px' : '16px',
+                          borderBottomLeftRadius: isMe ? '16px' : '4px',
+                          fontSize: '0.9rem',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                          wordWrap: 'break-word'
+                        }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatEndRef} />
               </div>
 
               {/* PICKER OVERLAYS */}
@@ -183,69 +273,23 @@ export default function Navigation() {
 
               {/* UNIFIED INPUT AREA */}
               <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>
-                
-                {/* Single Capsule Container */}
                 <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  backgroundColor: '#f8fafc', 
-                  borderRadius: '24px', 
-                  border: '1px solid #e2e8f0',
-                  padding: '4px',
-                  paddingLeft: '12px'
+                  display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', 
+                  borderRadius: '24px', border: '1px solid #e2e8f0', padding: '4px', paddingLeft: '12px' 
                 }}>
-                  
-                  {/* Text Input */}
                   <input 
                     type="text" 
                     placeholder="Type a message..." 
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 0',
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: '0.9rem',
-                      color: '#1e293b',
-                      minWidth: 0
-                    }}
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    style={{ flex: 1, padding: '8px 0', background: 'transparent', border: 'none', outline: 'none', fontSize: '0.9rem', color: '#1e293b', minWidth: 0 }}
                   />
-                  
-                  {/* Action Group */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <button 
-                      onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: showEmojiPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}
-                    >
-                      <Smile size={20} />
-                    </button>
-                    
-                    <button 
-                      onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}
-                    >
-                      <ImageIcon size={20} />
-                    </button>
-
-                    {/* Send Button INSIDE container */}
-                    <button 
-                      style={{
-                        background: 'var(--sandy-brown)',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px', height: '32px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: 'white',
-                        marginLeft: '4px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <Send size={14} />
-                    </button>
+                    <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showEmojiPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}><Smile size={20} /></button>
+                    <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sandy-brown)' : '#94a3b8', padding: '6px' }}><ImageIcon size={20} /></button>
+                    <button onClick={handleSendMessage} style={{ background: 'var(--sandy-brown)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', marginLeft: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }}><Send size={14} /></button>
                   </div>
-
                 </div>
               </div>
 
