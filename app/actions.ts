@@ -1,12 +1,13 @@
 /**
  * file: app/actions.ts
- * description: Switched Chat System to In-Memory storage to fix production persistence issues.
+ * description: Fixed missing 'os' import.
  */
 
 "use server";
 
 import fs from "fs/promises";
 import path from "path";
+import os from "os"; // <--- ADDED THIS IMPORT
 import { revalidatePath } from "next/cache";
 
 // ============================================================================
@@ -288,8 +289,11 @@ export async function deletePost(id: number) {
 
 
 // ============================================================================
-// 5. CHAT SYSTEM (IN-MEMORY FOR PRODUCTION COMPATIBILITY)
+// 5. CHAT SYSTEM (FILE BASED - TEMP DIR)
 // ============================================================================
+
+// Use OS Temp directory for write permissions in production/serverless
+const CHAT_DB_PATH = path.join(os.tmpdir(), "chat-db.json");
 
 export type ChatMessage = {
   id: number;
@@ -298,15 +302,18 @@ export type ChatMessage = {
   timestamp: string;
 };
 
-// Global variable acts as "database" in memory.
-// WARNING: This data will be lost when the server restarts or lambda spins down.
-let globalChats: ChatMessage[] = []; 
-
 export async function getChats(): Promise<ChatMessage[]> {
-  return globalChats;
+  try {
+    const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, return empty array
+    return [];
+  }
 }
 
 export async function addChat(text: string, author: string) {
+  const chats = await getChats();
   const newChat: ChatMessage = {
     id: Date.now(),
     author,
@@ -314,8 +321,14 @@ export async function addChat(text: string, author: string) {
     timestamp: new Date().toISOString()
   };
   
-  // Keep only last 100 messages
-  globalChats = [...globalChats, newChat].slice(-100); 
+  // Keep last 100 messages
+  const updatedChats = [...chats, newChat].slice(-100); 
   
-  return globalChats;
+  try {
+    await fs.writeFile(CHAT_DB_PATH, JSON.stringify(updatedChats, null, 2));
+  } catch (error) {
+    console.error("Failed to write chat DB:", error);
+  }
+  
+  return updatedChats;
 }
