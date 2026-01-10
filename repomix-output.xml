@@ -53,17 +53,23 @@ app/
     Navigation.tsx
   contact/
     page.tsx
+  feedback/
+    page.tsx
   mates/
     page.tsx
   my-room/
     page.tsx
   notifications/
     page.tsx
+  actions.ts
   favicon.ico
+  feedback-db.json
   globals.css
   layout.tsx
   page.tsx
+  praise-db.json
 public/
+  about.mp4
   file.svg
   globe.svg
   hero.png
@@ -84,12 +90,6 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/about/page.tsx">
-export default function About() {
-  return <div className="p-4 text-center">About</div>;
-}
-</file>
-
 <file path="app/chat/page.tsx">
 export default function Chat() {
   return <div className="p-4 text-center">House Chat</div>;
@@ -102,78 +102,82 @@ export default function CommonRoom() {
 }
 </file>
 
-<file path="app/components/Footer.tsx">
-import Link from "next/link";
-
-export default function Footer() {
-  return (
-    <footer className="w-full border-t border-gray-100 py-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-      <div className="flex flex-col gap-2">
-        <p>&copy; {new Date().getFullYear()} 212 May Street</p>
-        <p>
-          Built by{" "}
-          <Link 
-            href="https://idong-essien.vercel.app" 
-            target="_blank" 
-            className="font-bold text-[var(--sandy-brown)] transition-colors hover:text-[var(--sky-blue)]"
-          >
-            idongCodes
-          </Link>
-        </p>
-      </div>
-    </footer>
-  );
-}
-</file>
-
-<file path="app/components/Header.tsx">
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-export default function Header() {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
-
-  // If we are on the Home page, render NOTHING.
-  if (isHome) return null;
-
-  // Otherwise, render the standard Sky Blue Glass header
-  return (
-    <header 
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
-        width: '100%',
-        padding: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        backgroundColor: 'rgba(135, 206, 235, 0.6)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      }}
-    >
-      <Link href="/" style={{ textDecoration: 'none' }}>
-        <h1 style={{ 
-          margin: 0, 
-          fontSize: '1.5rem', 
-          fontWeight: 'bold',
-          color: 'var(--text-color)'
-        }}>
-          212 May St
-        </h1>
-      </Link>
-    </header>
-  );
-}
-</file>
-
 <file path="app/contact/page.tsx">
 export default function Contact() {
   return <div className="p-4 text-center">Contact</div>;
+}
+</file>
+
+<file path="app/feedback/page.tsx">
+import Link from "next/link";
+import { getFeedback } from "../actions";
+
+// Force dynamic so we always see new data
+export const dynamic = 'force-dynamic';
+
+export default async function FeedbackPage() {
+  const feedbacks = await getFeedback();
+
+  return (
+    <main style={{ minHeight: '100vh', padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)' }}>
+          Feature Requests & Bugs
+        </h1>
+        <p style={{ color: 'gray', marginTop: '10px' }}>
+          Things we need to fix or build next.
+        </p>
+        <Link 
+          href="/" 
+          style={{ 
+            display: 'inline-block', 
+            marginTop: '1rem', 
+            textDecoration: 'underline', 
+            color: 'var(--sky-blue)',
+            fontWeight: 'bold' 
+          }}
+        >
+          ← Back Home
+        </Link>
+      </div>
+
+      <div style={{ display: 'grid', gap: '1.5rem' }}>
+        {feedbacks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#f9fafb', borderRadius: '20px' }}>
+                <p style={{ color: 'gray' }}>No feedback yet. Be the first!</p>
+            </div>
+        ) : (
+            feedbacks.map((f) => (
+                <div key={f.id} style={{ 
+                    backgroundColor: 'white', 
+                    padding: '1.5rem', 
+                    borderRadius: '15px', 
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                    border: '1px solid #e5e7eb'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#171717' }}>
+                            {f.subject}
+                        </h3>
+                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                            {new Date(f.submittedAt).toLocaleDateString()}
+                        </span>
+                    </div>
+                    
+                    <p style={{ color: '#4b5563', lineHeight: '1.5', marginBottom: '1rem' }}>
+                        {f.message}
+                    </p>
+                    
+                    <div style={{ fontSize: '0.9rem', borderTop: '1px solid #f3f4f6', paddingTop: '10px', display: 'flex', gap: '10px' }}>
+                        <span style={{ fontWeight: 'bold' }}>{f.name}</span>
+                        <span style={{ color: 'var(--sky-blue)' }}>• {f.role}</span>
+                    </div>
+                </div>
+            ))
+        )}
+      </div>
+    </main>
+  );
 }
 </file>
 
@@ -193,6 +197,109 @@ export default function MyRoom() {
 export default function Notifications() {
   return <div className="p-4 text-center">Notifications</div>;
 }
+</file>
+
+<file path="app/actions.ts">
+"use server";
+
+import fs from "fs/promises";
+import path from "path";
+import { revalidatePath } from "next/cache";
+
+// --- PRAISE SYSTEM ---
+const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
+
+type Praise = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+};
+
+// ... existing praise seed data ...
+const PRAISE_SEED_DATA: Praise[] = [
+  { 
+    id: 1, 
+    name: "Idong", 
+    role: "Tenant", 
+    subject: "🚀 🥂", 
+    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽" 
+  }
+];
+
+export async function getPraises(): Promise<Praise[]> {
+  try {
+    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
+    return PRAISE_SEED_DATA;
+  }
+}
+
+export async function addPraise(newPraise: Praise) {
+  const praises = await getPraises();
+  const updatedPraises = [newPraise, ...praises];
+  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
+  revalidatePath("/");
+  return updatedPraises;
+}
+
+// --- NEW: FEEDBACK SYSTEM ---
+const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
+
+export type Feedback = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+  submittedAt: string;
+};
+
+export async function getFeedback(): Promise<Feedback[]> {
+  try {
+    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, return empty array
+    return [];
+  }
+}
+
+export async function addFeedback(newFeedback: Feedback) {
+  const list = await getFeedback();
+  const updated = [newFeedback, ...list];
+  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  revalidatePath("/feedback"); // Refresh the feedback page
+  return updated;
+}
+</file>
+
+<file path="app/feedback-db.json">
+[
+  {
+    "id": 1767915877558,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "Chat Feature ?",
+    "message": "I'd love a real time chat feature !",
+    "submittedAt": "2026-01-08T23:44:37.558Z"
+  }
+]
+</file>
+
+<file path="app/praise-db.json">
+[
+  {
+    "id": 1,
+    "name": "Idong",
+    "role": "Tenant",
+    "subject": "🚀 🥂",
+    "message": "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽"
+  }
+]
 </file>
 
 <file path="public/file.svg">
@@ -376,6 +483,350 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 }
 </file>
 
+<file path="app/about/page.tsx">
+import React from 'react';
+import { User, Heart, Crown, Baby, MapPin } from 'lucide-react';
+
+export default function About() {
+  
+  const family = [
+    {
+      name: "Kennedy (Kay) Udechukwu",
+      age: "31",
+      role: "Landlord & Owner",
+      icon: <Crown size={32} color="#F4A460" />, 
+      desc: "Nigeria to America. Loving father and husband. Engineering degree, great with finances, loves soccer, very sociable, all around cool guy."
+    },
+    {
+      name: "Stephanie (Steph) Udechukwu",
+      age: "34",
+      role: "First Lady",
+      icon: <Heart size={32} color="#FF69B4" />, 
+      desc: "Kay's adored and loving wife. Steph is a Portuguese speaker, dance, health and fitness guru, can slay Portuguese AND Nigerian dishes, and loves reality TV."
+    },
+    {
+      name: "Kennedy Jr (Kennegium 😅)",
+      age: "Baby Menace",
+      role: "1st Prince of 212 May St",
+      icon: <Baby size={32} color="#87CEEB" />, 
+      desc: "Son to Kay & Steph. KJ is craaaazyy but cute asf, more to be determined lmao."
+    }
+  ];
+
+  return (
+    <main style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden', overflowY: 'auto' }}>
+      
+      {/* 1. BACKGROUND VIDEO */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            objectFit: 'cover', 
+            objectPosition: 'center' 
+          }}
+        >
+          <source src="/about.mp4" />
+        </video>
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: 0, left: 0, right: 0, bottom: 0, 
+            backgroundColor: 'rgba(0, 0, 0, 0.5)' 
+          }} 
+        />
+      </div>
+
+      {/* 2. SCROLLABLE CONTENT */}
+      <div 
+        style={{ 
+          position: 'relative', 
+          zIndex: 10, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          padding: '6rem 2rem 6rem 2rem' 
+        }}
+      >
+        
+        {/* Title Section */}
+        <div className="animate-fade-in" style={{ textAlign: 'center', marginBottom: '3rem', color: 'white' }}>
+          <h1 style={{ 
+            fontSize: '3.5rem', 
+            fontWeight: 'bold', 
+            textShadow: '0 4px 10px rgba(0,0,0,0.5)',
+            marginBottom: '1rem'
+          }}>
+            Our Story
+          </h1>
+          <p style={{ fontSize: '1.25rem', opacity: 0.9, maxWidth: '600px', margin: '0 auto' }}>
+            More than just a street address. It's where the magic happens.
+          </p>
+        </div>
+
+        {/* --- THE HQ CARD --- */}
+        <div 
+          className="animate-slide-in"
+          style={{
+            maxWidth: '800px',
+            width: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: '30px',
+            padding: '3rem',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            marginBottom: '2rem'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+            <h2 style={{ color: 'var(--sandy-brown)', fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+              The HQ
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '20px' }}>
+              <MapPin size={18} color="var(--sky-blue)" />
+              <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Worcester, MA 01602</span>
+            </div>
+          </div>
+          
+          {/* SECTION 1: OUR HOOD */}
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--sky-blue)' }}>
+            Our Hood
+          </h3>
+          <p style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#e5e5e5', marginBottom: '1.5rem' }}>
+            Located in a charming, leafy neighborhood just moments from Worcester State University, <strong>212 May Street</strong> offers the perfect blend of quiet residential living and city accessibility. This classic New England multi-family home features spacious interiors, abundant natural light, and a backyard perfect for summer gatherings.
+          </p>
+
+          <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '2rem 0' }} />
+
+          {/* SECTION 2: OUR BUNKER */}
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--sky-blue)' }}>
+            Our Bunker
+          </h3>
+          <p style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#d4d4d4', marginBottom: '2rem', fontStyle: 'italic' }}>
+            "This beautifully renovated home is just what you are looking for. Kitchen features stainless steel appliances, granite countertops, and new cabinets. Enjoy entertaining in the spacious living room. Dining room features beautiful hardwood floors, original woodwork and bench seat. Enjoy the convenience of the first floor laundry. Master bedroom, three additional bedrooms and a full bath are located on the second floor. Third floor offers the bonus of two additional good sized bedrooms. New windows. Relaxing front porch."
+          </p>
+
+          {/* Stats Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+            gap: '1.5rem', 
+            borderTop: '1px solid rgba(255,255,255,0.1)', 
+            paddingTop: '2rem' 
+          }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '1px' }}>Built</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>1900</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '1px' }}>Interior</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>2,286 sqft</span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '1px' }}>Lot Size</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>8,712 sqft</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '1px' }}>Layout</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>4 Bed / 2 Bath</span>
+            </div>
+
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '1px' }}>Heating</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Gas</span>
+            </div>
+
+          </div>
+        </div>
+
+        {/* --- MISSION & RULES CARD --- */}
+        <div 
+          className="animate-slide-in"
+          style={{
+            maxWidth: '800px',
+            width: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: '30px',
+            padding: '3rem',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            marginBottom: '4rem'
+          }}
+        >
+          <h2 style={{ color: 'var(--sandy-brown)', fontSize: '2rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+            The Mission
+          </h2>
+          
+          <p style={{ lineHeight: '1.8', marginBottom: '2rem', fontSize: '1.1rem', color: '#e5e5e5' }}>
+            Welcome to the 212 May Street companion app. We built this in an endeavour to help make communal living feel fun, easier, funnier, and more connected. Whether it's coordinating the next movie night, figuring out whose turn it is to buy milk, making a big announcement or just sharing a meme in the house chat, this is your digital home base, a full-blown dashboard for your daily lives.
+          </p>
+
+          <hr style={{ border: 'none', borderTop: '2px dashed rgba(255,255,255,0.2)', margin: '2rem 0' }} />
+
+          <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--sky-blue)' }}>
+            House Rules
+          </h3>
+          <p style={{ fontSize: '0.9rem', color: '#a3a3a3', marginBottom: '1.5rem', fontStyle: 'italic' }}>
+            (Subject to reg updates)
+          </p>
+
+          <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '1rem', color: '#e5e5e5' }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.5rem' }}>🧼</span> 
+              <span style={{ fontSize: '1.1rem' }}>Leave the common areas cleaner than you found them.</span>
+            </li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.5rem' }}>🎧</span> 
+              <span style={{ fontSize: '1.1rem' }}>Quiet hours after 9 PM (unless it's a party).</span>
+            </li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.5rem' }}>❤️</span> 
+              <span style={{ fontSize: '1.1rem' }}>Show kindness and consider each other!</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* --- MEET THE FAM --- */}
+        <div style={{ width: '100%', maxWidth: '1200px' }}>
+          <h2 className="animate-fade-in" style={{ 
+            textAlign: 'center', 
+            color: 'white', 
+            fontSize: '2.5rem', 
+            fontWeight: 'bold', 
+            marginBottom: '3rem', 
+            textShadow: '0 2px 5px rgba(0,0,0,0.5)' 
+          }}>
+            Meet the Fam
+          </h2>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
+            {family.map((person, index) => (
+              <div 
+                key={index}
+                className="animate-slide-in"
+                style={{
+                  flex: '1 1 350px', 
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                  backdropFilter: 'blur(15px)',
+                  WebkitBackdropFilter: 'blur(15px)',
+                  borderRadius: '25px',
+                  padding: '2rem',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                  color: 'white',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  animationDelay: `${index * 0.2}s` 
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.1)', 
+                    padding: '12px', 
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {person.icon}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold' }}>{person.name}</h3>
+                    <span style={{ color: 'var(--sky-blue)', fontSize: '0.9rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                      {person.role}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ alignSelf: 'flex-start' }}>
+                   <span style={{ 
+                     backgroundColor: 'rgba(255,255,255,0.15)', 
+                     padding: '4px 12px', 
+                     borderRadius: '20px', 
+                     fontSize: '0.85rem',
+                     fontWeight: 'bold',
+                     color: '#e5e5e5'
+                   }}>
+                     Age: {person.age}
+                   </span>
+                </div>
+
+                <p style={{ lineHeight: '1.6', color: '#d4d4d4', flex: 1 }}>
+                  {person.desc}
+                </p>
+
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/components/Header.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export default function Header() {
+  const pathname = usePathname();
+  
+  // HIDE HEADER on: Home page AND About page
+  const isHidden = pathname === "/" || pathname === "/about";
+
+  if (isHidden) return null;
+
+  // Otherwise, render the standard Sky Blue Glass header
+  return (
+    <header 
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        width: '100%',
+        padding: '1rem',
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: 'rgba(135, 206, 235, 0.6)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(135, 206, 235, 0.3)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+      }}
+    >
+      <Link href="/" style={{ textDecoration: 'none' }}>
+        <h1 style={{ 
+          margin: 0, 
+          fontSize: '1.5rem', 
+          fontWeight: 'bold',
+          color: 'var(--text-color)'
+        }}>
+          212 May St
+        </h1>
+      </Link>
+    </header>
+  );
+}
+</file>
+
 <file path="app/components/Navigation.tsx">
 "use client";
 
@@ -453,6 +904,55 @@ export default function Navigation() {
 }
 </file>
 
+<file path="app/components/Footer.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export default function Footer() {
+  const pathname = usePathname();
+  const isAbout = pathname === "/about";
+
+  return (
+    <footer 
+      style={{
+        width: '100%',
+        // Conditional Background: Transparent on About, Sky Blue everywhere else
+        backgroundColor: isAbout ? 'transparent' : 'var(--sky-blue)', 
+        color: 'white',
+        padding: '3rem 1rem 8rem 1rem', 
+        textAlign: 'center',
+        marginTop: 'auto', 
+        // Remove border on About page for a cleaner look
+        borderTop: isAbout ? 'none' : '4px solid rgba(255,255,255,0.2)' 
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>
+          &copy; {new Date().getFullYear()} 212 May Street
+        </p>
+        <p style={{ margin: 0, opacity: 0.9 }}>
+          Built with 🫶 by{" "}
+          <Link 
+            href="https://idong-essien.vercel.app" 
+            target="_blank" 
+            style={{ 
+              fontWeight: 'bold', 
+              color: 'white', 
+              textDecoration: 'underline',
+              textUnderlineOffset: '4px'
+            }}
+          >
+            idongCodes
+          </Link>
+        </p>
+      </div>
+    </footer>
+  );
+}
+</file>
+
 <file path="package.json">
 {
   "name": "212mayst",
@@ -484,119 +984,287 @@ export default function Navigation() {
 </file>
 
 <file path="app/page.tsx">
-import Image from "next/image";
-import Link from "next/link"; // Import Link
+"use client"; 
+
+import React, { useState, useEffect, useRef } from "react"; // Added useRef
+import Link from "next/link";
+import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb } from "lucide-react";
+import { getPraises, addPraise, addFeedback } from "./actions";
+
+// --- HELPER COMPONENT: FADE IN ON SCROLL ---
+function FadeInSection({ children }: { children: React.ReactNode }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const domRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        // Only set visible to TRUE (never set back to false, so it stays visible once scrolled past)
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      });
+    });
+    
+    const currentElement = domRef.current;
+    if (currentElement) {
+      observer.observe(currentElement);
+    }
+
+    return () => {
+      if (currentElement) observer.unobserve(currentElement);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={domRef}
+      className={`fade-in-section ${isVisible ? 'is-visible' : ''}`}
+      style={{ width: '100%' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// --- MAIN PAGE COMPONENT ---
+type Praise = {
+  id: number;
+  name: string;
+  role: string;
+  subject: string;
+  message: string;
+};
 
 export default function Home() {
+  const [praises, setPraises] = useState<Praise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [praiseForm, setPraiseForm] = useState({
+    name: "", role: "Tenant", subject: "", message: ""
+  });
+
+  const [feedbackForm, setFeedbackForm] = useState({
+    name: "", role: "Tenant", subject: "", message: ""
+  });
+  const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
+
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await getPraises();
+      setPraises(data);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setPraiseForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFeedbackForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePraiseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!praiseForm.name || !praiseForm.message) return;
+
+    const newPraise = { id: Date.now(), ...praiseForm };
+    setPraises([newPraise, ...praises]); 
+    setPraiseForm({ name: "", role: "Tenant", subject: "", message: "" });
+    await addPraise(newPraise);
+  };
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackForm.name || !feedbackForm.message) return;
+
+    setFeedbackStatus("submitting");
+    const newFeedback = {
+        id: Date.now(),
+        ...feedbackForm,
+        submittedAt: new Date().toISOString()
+    };
+    await addFeedback(newFeedback);
+    setFeedbackForm({ name: "", role: "Tenant", subject: "", message: "" });
+    setFeedbackStatus("success");
+    setTimeout(() => setFeedbackStatus("idle"), 3000);
+  };
+
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* HERO SECTION */}
-      <section 
-        style={{
-          position: 'relative',
-          height: '70vh', 
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center', 
-          justifyContent: 'flex-start', 
-          overflow: 'hidden',
-          padding: '0 2rem' 
-        }}
-      >
-        {/* Background Video Container */}
-        <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'cover', 
-              objectPosition: 'center' 
-            }}
-          >
-            <source src="/heroVid.mov" />
-            Your browser does not support the video tag.
-          </video>
-
-          {/* Vignette & Fade Layers */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)',
-              opacity: 0.8 
-            }} 
-          /> 
-          <div 
-            style={{ 
-              position: 'absolute', 
-              bottom: 0, left: 0, right: 0, 
-              height: '30%', 
-              background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)',
-            }} 
-          />
-        </div>
-
-        {/* Text Content + Buttons */}
-        <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
-          <h1 
-            style={{ 
-              fontSize: '3.5rem', 
-              fontWeight: 'bold', 
-              color: 'white', 
-              marginBottom: '1rem',
-              textShadow: '0 5px 5px rgba(0,0,0,0.5)'
-            }}
-          >
-            212 May Street
-          </h1>
-          <p 
-            style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: '500', 
-              color: 'white',
-              marginBottom: '2rem', /* Added space for buttons */
-              textShadow: '0 3px 3px rgba(0,0,0,0.5)' 
-            }}
-          >
-            Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!
-          </p>
-
-          {/* NEW BUTTONS */}
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <Link href="/login" className="hero-btn btn-login">
-              Login
-            </Link>
-            <Link href="/join" className="hero-btn btn-join">
-              Join 212 May St
-            </Link>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Content Section */}
-      <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
-        <div 
-          style={{ 
-            backgroundColor: 'var(--bg-color)', 
-            padding: '2rem', 
-            borderRadius: '20px', 
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
+      {/* HERO SECTION - Wrapped in FadeInSection */}
+      <FadeInSection>
+        <section 
+          style={{
+            position: 'relative',
+            height: '70vh', 
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center', 
+            justifyContent: 'flex-start', 
+            overflow: 'hidden',
+            padding: '0 2rem' 
           }}
         >
-          <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-            What's New?
-          </h2>
-          <p style={{ color: 'gray' }}>
-            Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.
-          </p>
-        </div>
-      </section>
+          <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+            <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}>
+              <source src="/heroVid.mov" />
+            </video>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle, rgba(0,0,0,0) 25%, var(--sky-blue) 100%)', opacity: 0.8 }} /> 
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', background: 'linear-gradient(to top, var(--sky-blue) 15%, transparent 100%)' }} />
+          </div>
+
+          <div className="animate-slide-in" style={{ position: 'relative', zIndex: 10, maxWidth: '600px', textAlign: 'left' }}>
+            <h1 style={{ fontSize: '3.5rem', fontWeight: 'bold', color: 'white', marginBottom: '1rem', textShadow: '0 5px 5px rgba(0,0,0,0.5)' }}>212 May Street</h1>
+            <p style={{ fontSize: '1.25rem', fontWeight: '500', color: 'white', marginBottom: '2rem', textShadow: '0 3px 3px rgba(0,0,0,0.5)' }}>Welcome to 212 May Street's...companion web app? Like Home Sweet Home... but from your phone or computer, ha!</p>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <Link href="/login" className="hero-btn btn-login">Login</Link>
+              <Link href="/join" className="hero-btn btn-join">Join 212 May St</Link>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* FEATURES SECTION - Wrapped */}
+      <FadeInSection>
+        <section style={{ backgroundColor: 'var(--sky-blue)', padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><MessageCircle size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>House Chat</h3>
+              <p style={{ color: 'gray' }}>Stay connected with everyone. Coordinate plans, share updates, or just say hi.</p>
+            </div>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><Calendar size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Events & Plans</h3>
+              <p style={{ color: 'gray' }}>Never miss a house dinner or movie night. check the calendar and join in.</p>
+            </div>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '2rem', flex: '1 1 300px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--sandy-brown)', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><ClipboardList size={48} /></div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#171717' }}>Tasks & Chores</h3>
+              <p style={{ color: 'gray' }}>Keep the house running smoothly. See what needs doing and lend a hand.</p>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* PRAISE SECTION - Wrapped */}
+      <FadeInSection>
+        <section style={{ backgroundColor: '#f9fafb', padding: '4rem 1.5rem' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            
+            {(praises.length > 0 || loading) && (
+              <div style={{ marginBottom: '4rem', background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', padding: '2rem', borderRadius: '20px', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ textAlign: 'center', color: 'var(--sandy-brown)', fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}>House Love <span style={{fontSize: '1.5rem'}}>🫶</span></h2>
+                {loading ? <p style={{ textAlign: 'center', color: '#0369a1' }}>Loading love...</p> : (
+                  <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    {praises.map((p) => (
+                      <div key={p.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
+                        <div style={{ marginBottom: '0.5rem' }}><h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717' }}>{p.subject}</h4></div>
+                        <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{p.name}</span><span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+              <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
+              <form onSubmit={handlePraiseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>First Name</label>
+                    <input type="text" name="name" value={praiseForm.name} onChange={handlePraiseChange} placeholder="Jane" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 200px' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Role</label>
+                    <select name="role" value={praiseForm.role} onChange={handlePraiseChange} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', backgroundColor: 'white' }}>
+                      <option value="Tenant">Tenant</option>
+                      <option value="Owner">Owner</option>
+                      <option value="First Lady">First Lady</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Subject</label>
+                  <input type="text" name="subject" value={praiseForm.subject} onChange={handlePraiseChange} placeholder="Just saying hi!" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#4b5563' }}>Message</label>
+                  <textarea name="message" value={praiseForm.message} onChange={handlePraiseChange} placeholder="Share your thoughts..." required rows={4} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', fontFamily: 'inherit' }} />
+                </div>
+                <button type="submit" style={{ marginTop: '10px', backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.2s', width: '100%' }}>Send Praise <Send size={18} /></button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* FEEDBACK SECTION - Wrapped */}
+      <FadeInSection>
+        <section style={{ backgroundColor: '#1e293b', padding: '4rem 1.5rem', color: 'white' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
+              <Bug size={32} color="var(--sandy-brown)" />
+              <Lightbulb size={32} color="var(--sky-blue)" />
+            </div>
+
+            <h3 style={{ textAlign: 'center', fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Help us improve</h3>
+            <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '2rem' }}>
+              Have a feature request, found a bug, or just want to chat? We are listening.
+              <br/>
+              <Link href="/feedback" style={{ color: 'var(--sky-blue)', textDecoration: 'underline', marginTop: '10px', display: 'inline-block' }}>View submitted feedback</Link>
+            </p>
+
+            <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>
+                  <input type="text" name="name" value={feedbackForm.name} onChange={handleFeedbackChange} placeholder="John" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+                </div>
+                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Role</label>
+                  <select name="role" value={feedbackForm.role} onChange={handleFeedbackChange} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }}>
+                    <option value="Tenant">Tenant</option>
+                    <option value="Landlord">Landlord</option>
+                    <option value="First Lady">First Lady</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Subject</label>
+                <input type="text" name="subject" value={feedbackForm.subject} onChange={handleFeedbackChange} placeholder="Feature Request: Dark Mode" required style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>Message</label>
+                <textarea name="message" value={feedbackForm.message} onChange={handleFeedbackChange} placeholder="Tell us what's on your mind..." required rows={4} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#1e293b', color: 'white', fontSize: '1rem', fontFamily: 'inherit' }} />
+              </div>
+              <button type="submit" disabled={feedbackStatus === "submitting" || feedbackStatus === "success"} style={{ backgroundColor: feedbackStatus === "success" ? 'var(--light-green)' : 'var(--sky-blue)', color: feedbackStatus === "success" ? '#171717' : 'white', border: 'none', padding: '14px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', opacity: feedbackStatus === "submitting" ? 0.7 : 1 }}>
+                {feedbackStatus === "submitting" ? "Sending..." : feedbackStatus === "success" ? "Received! Thanks." : "Submit Feedback"}
+              </button>
+            </form>
+          </div>
+        </section>
+      </FadeInSection>
+
+      {/* WHAT'S NEW SECTION - Wrapped */}
+      <FadeInSection>
+        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>What's New?</h2>
+            <p style={{ color: 'gray' }}>Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.</p>
+          </div>
+        </section>
+      </FadeInSection>
 
     </main>
   );
@@ -659,6 +1327,19 @@ a {
   animation: slideIn 1s ease-out 0.5s forwards;
 }
 
+/* SCROLL ANIMATIONS */
+.fade-in-section {
+  opacity: 0;
+  transform: translateY(30px); /* Start 30px lower */
+  transition: opacity 1s ease-out, transform 1s ease-out;
+  will-change: opacity, visibility;
+}
+
+.fade-in-section.is-visible {
+  opacity: 1;
+  transform: translateY(0); /* Slide up to original position */
+}
+
 /* HERO BUTTONS */
 .hero-btn {
   display: inline-flex;
@@ -704,7 +1385,7 @@ import type { Metadata } from "next";
 import "./globals.css"; 
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
-import Header from "./components/Header"; // Import the new component
+import Header from "./components/Header"; 
 
 export const metadata: Metadata = {
   title: "212 May Street",
@@ -719,7 +1400,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* New Client Header handles logic for Home vs Pages */}
         <Header />
 
         {children}
