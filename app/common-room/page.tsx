@@ -1,6 +1,6 @@
 /**
  * file: app/common-room/page.tsx
- * description: Added Admin Delete capability for 'idongcodes' on all posts.
+ * description: Posts now display date in mm/dd/yyyy format + time.
  */
 
 "use client";
@@ -10,12 +10,7 @@ import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2
 import { addPost, getPosts, editPost, deletePost, Post } from '../actions';
 import Link from 'next/link';
 
-const COMMON_EMOJIS = [
-  "😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔",
-  "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", 
-  "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋",
-  "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"
-];
+const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
 const MAX_CHARS = 250;
 
 export default function CommonRoom() {
@@ -30,7 +25,7 @@ export default function CommonRoom() {
   
   const [authorName, setAuthorName] = useState("Guest");
   const [isGuest, setIsGuest] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false); // Admin check
+  const [isAdmin, setIsAdmin] = useState(false); 
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -49,9 +44,7 @@ export default function CommonRoom() {
       const user = JSON.parse(storedUser);
       setAuthorName(user.alias || user.firstName);
       setIsGuest(false);
-      if (user.alias === 'idongcodes') {
-        setIsAdmin(true);
-      }
+      if (user.alias === 'idongcodes') setIsAdmin(true);
     }
   }, []);
 
@@ -62,9 +55,7 @@ export default function CommonRoom() {
     }
   }, [message]);
 
-  useEffect(() => {
-    if (editingId && editInputRef.current) editInputRef.current.focus();
-  }, [editingId]);
+  useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
 
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
@@ -82,15 +73,11 @@ export default function CommonRoom() {
     setLoading(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); }
-  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
 
   const isEditable = (post: Post) => {
     if ((post.editCount || 0) >= 1) return false;
-    const postTime = new Date(post.timestamp).getTime();
-    const fifteenMinutes = 15 * 60 * 1000;
-    return (Date.now() - postTime) < fifteenMinutes;
+    return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000;
   };
 
   const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); };
@@ -109,35 +96,38 @@ export default function CommonRoom() {
     setSaveLoading(false);
   };
 
-  // ADMIN ACTION
   const handleDeletePost = async (id: number) => {
     if (!confirm("Admin: Delete this post?")) return;
     setPosts(posts.filter(p => p.id !== id));
     await deletePost(id);
   };
 
+  // UPDATED DATE FORMATTER
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // mm/dd/yyyy, hh:mm am/pm
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
   };
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         
-        {/* Header */}
+        {/* Header & Input UI (Unchanged) */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
             {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
           </h1>
-          {isGuest ? (
-            <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p>
-          ) : (
-            <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>
-          )}
+          {isGuest ? <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p> : <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>}
         </div>
 
-        {/* Input */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -163,7 +153,7 @@ export default function CommonRoom() {
           <input type="file" ref={uploadInputRef} accept="image/*" hidden />
         </div>
 
-        {/* Feed */}
+        {/* Feed with new Date Format */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
@@ -174,24 +164,20 @@ export default function CommonRoom() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      {formatDate(post.timestamp)}
+                      {(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}
+                    </span>
                   </div>
-                  
-                  {/* ACTIONS GROUP */}
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    
-                    {/* EDIT: Only Author */}
                     {!editingId && post.author === authorName && isEditable(post) && (
                       <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>
                     )}
-
-                    {/* DELETE: Admin Only */}
                     {isAdmin && (
                       <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>
                     )}
                   </div>
                 </div>
-
                 {editingId === post.id ? (
                   <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />

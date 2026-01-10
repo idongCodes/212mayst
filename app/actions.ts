@@ -15,12 +15,13 @@ import { revalidatePath } from "next/cache";
 
 const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
 
-type Praise = {
+export type Praise = {
   id: number;
   name: string;
   role: string;
   subject: string;
   message: string;
+  submittedAt?: string;
 };
 
 const PRAISE_SEED_DATA: Praise[] = [
@@ -46,6 +47,13 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const praises = await getPraises();
+
+  // Ensure timestamp is present
+  const praiseWithDate = {
+    ...newPraise,
+    submittedAt: newPraise.submittedAt || new Date().toISOString()
+  };
+
   const updatedPraises = [newPraise, ...praises];
   await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
   revalidatePath("/"); // Refresh Home page
