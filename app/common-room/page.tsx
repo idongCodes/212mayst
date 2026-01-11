@@ -1,6 +1,6 @@
 /**
  * file: app/common-room/page.tsx
- * description: Displays User Profile Photos on Posts & Replies.
+ * description: Converted all Edit inputs to Textareas for multi-line support.
  */
 
 "use client";
@@ -42,7 +42,7 @@ export default function CommonRoom() {
   
   const [authorName, setAuthorName] = useState("Guest");
   const [userPhone, setUserPhone] = useState(""); 
-  const [currentUser, setCurrentUser] = useState<any>(null); // <--- Added to access profilePic
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false); 
 
@@ -50,7 +50,9 @@ export default function CommonRoom() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
+  
+  // UPDATED: Changed to TextArea Refs
+  const editInputRef = useRef<HTMLTextAreaElement>(null); 
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function CommonRoom() {
       const user = JSON.parse(storedUser);
       setAuthorName(user.alias || user.firstName);
       setUserPhone(user.phone);
-      setCurrentUser(user); // <--- Store full user object
+      setCurrentUser(user);
       setIsGuest(false);
       
       if (user.isAdmin) {
@@ -74,9 +76,18 @@ export default function CommonRoom() {
     }
   }, []);
 
+  // Auto-resize logic for Create Post & Reply inputs
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; } }, [message]);
   useEffect(() => { if (replyTextareaRef.current) { replyTextareaRef.current.style.height = 'auto'; replyTextareaRef.current.style.height = `${replyTextareaRef.current.scrollHeight}px`; } }, [replyText, replyingToId]);
-  useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
+  
+  // Auto-resize logic for Edit Post input
+  useEffect(() => { 
+    if (editingId && editInputRef.current) {
+      editInputRef.current.style.height = 'auto';
+      editInputRef.current.style.height = `${editInputRef.current.scrollHeight}px`;
+      editInputRef.current.focus();
+    } 
+  }, [editingId, editText]);
 
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
@@ -117,7 +128,7 @@ export default function CommonRoom() {
       replies: [], 
       image: mediaType === 'image' ? mediaUrl : undefined, 
       video: mediaType === 'video' ? mediaUrl : undefined,
-      authorProfilePic: currentUser?.profilePic // <--- Optimistic Pic
+      authorProfilePic: currentUser?.profilePic 
     };
     setPosts([newPost, ...posts]);
     setMessage(""); setSelectedFile(null); setPreviewUrl(""); setMediaType(null); setMediaError(""); setShowEmojiPicker(false);
@@ -137,7 +148,7 @@ export default function CommonRoom() {
       content: replyText.trim(), 
       timestamp: new Date().toISOString(), 
       editCount: 0,
-      authorProfilePic: currentUser?.profilePic // <--- Optimistic Pic
+      authorProfilePic: currentUser?.profilePic 
     };
     const updatedPosts = posts.map(p => { if (p.id === postId) { return { ...p, replies: [...(p.replies || []), newReply] }; } return p; });
     setPosts(updatedPosts);
@@ -205,7 +216,7 @@ export default function CommonRoom() {
           {isGuest ? <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p> : <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>}
         </div>
 
-        {/* Input Area */}
+        {/* Create Post Input Area */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -255,12 +266,21 @@ export default function CommonRoom() {
                   </div>
                 </div>
 
-                {/* Content */}
+                {/* Post Content & Edit Mode */}
                 {editingId === post.id ? (
-                  <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
-                    <button onClick={saveEdit} disabled={saveLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#171717' }}><Check size={16} /></button>
-                    <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
+                  <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    {/* UPDATED: TEXTAREA FOR EDITING */}
+                    <textarea 
+                      ref={editInputRef} 
+                      value={editText} 
+                      onChange={(e) => setEditText(e.target.value)} 
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), saveEdit())} 
+                      maxLength={MAX_CHARS} 
+                      rows={1}
+                      style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none', resize: 'none', overflow: 'hidden', fontFamily: 'inherit', fontSize: '1rem', lineHeight: '1.5' }} 
+                    />
+                    <button onClick={saveEdit} disabled={saveLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#171717', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={16} /></button>
+                    <button onClick={cancelEditing} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', color: '#64748b', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
                   </div>
                 ) : (
                   <>
@@ -313,9 +333,16 @@ export default function CommonRoom() {
                           </div>
                           {editingReplyId === reply.id ? (
                              <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                               <input type="text" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveReplyEdit()} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--sky-blue)', outline: 'none', fontSize: '0.9rem' }} />
-                               <button onClick={saveReplyEdit} disabled={saveReplyLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#171717' }}><Check size={14} /></button>
-                               <button onClick={cancelEditingReply} style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#64748b' }}><X size={14} /></button>
+                               {/* UPDATED: TEXTAREA FOR EDITING REPLY */}
+                               <textarea 
+                                 value={editReplyText} 
+                                 onChange={(e) => setEditReplyText(e.target.value)} 
+                                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), saveReplyEdit())} 
+                                 rows={1}
+                                 style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--sky-blue)', outline: 'none', fontSize: '0.9rem', resize: 'none', overflow: 'hidden', fontFamily: 'inherit' }} 
+                               />
+                               <button onClick={saveReplyEdit} disabled={saveReplyLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#171717', height: '30px', width: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={14} /></button>
+                               <button onClick={cancelEditingReply} style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#64748b', height: '30px', width: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                              </div>
                           ) : ( <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p> )}
                         </div>

@@ -1,5 +1,9 @@
 /* RESET & VARIABLES */
 :root {
+  /* 1. Force system UI (inputs, scrollbars, etc.) to use Light Mode styles */
+  color-scheme: light;
+
+  /* 2. Your Defined Colors (These will now be permanent) */
   --sky-blue: #87CEEB;
   --sandy-brown: #F4A460;
   --light-green: #90EE90;
@@ -7,12 +11,9 @@
   --text-color: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #0a0a0a;
-    --text-color: #ededed;
-  }
-}
+/* ❌ DELETED: The @media (prefers-color-scheme: dark) block 
+   This ensures the browser never overrides your variables with dark colors.
+*/
 
 * {
   box-sizing: border-box;
