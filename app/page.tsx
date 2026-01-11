@@ -79,8 +79,7 @@ useEffect(() => {
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        setUserPhone(parsedUser.phone); // Capture Phone
-        
+        setUserPhone(parsedUser.phone); // Capture 
         // Admin Check
         if (parsedUser.isAdmin || parsedUser.alias === 'idongcodes') setIsAdmin(true);
         
@@ -104,7 +103,7 @@ useEffect(() => {
   const handlePraiseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!praiseForm.name || !praiseForm.message) return;
-    const newPraise = { id: Date.now(), ...praiseForm, submittedAt: new Date().toISOString() };
+    const newPraise = { id: Date.now(), ...praiseForm, userImage: user?.profilePic || null, submittedAt: new Date().toISOString() };
     setPraises([newPraise, ...praises]); 
     setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     await addPraise(newPraise);
@@ -259,7 +258,31 @@ useEffect(() => {
                         )}
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
+                          <div style={{ 
+      width: '45px', 
+      height: '45px', 
+      borderRadius: '50%', 
+      overflow: 'hidden', 
+      backgroundColor: 'rgba(255,255,255,0.6)', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      border: '2px solid white', 
+      boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+      flexShrink: 0 
+    }}>
+    {/* Check if p.userImage exists (and is not null/empty) */}
+    {(p as any).userImage ? (
+      <img 
+        src={(p as any).userImage} 
+        alt={p.name} 
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+      />
+    ) : (
+      // Fallback if no image
+      <User size={24} color="#9ca3af" />
+    )}
+  </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#171717' }}>{user ? p.name : "Housemate"}</span>
                             <span style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{p.role}</span>
