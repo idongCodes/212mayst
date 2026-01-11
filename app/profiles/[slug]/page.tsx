@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Phone, Mail, MapPin, User, Home, MessageCircle, Heart, Camera } from 'lucide-react';
+import { ArrowLeft, Calendar, Phone, Mail, MapPin, User, Home } from 'lucide-react';
 import { getUsers } from '../../actions';
 
 export default function ProfilePage() {
@@ -19,9 +19,9 @@ export default function ProfilePage() {
 
   // Parse slug to get first and last name
   const slug = params.slug as string;
-  const [firstName, lastName] = slug.split('-').map(part => 
-    part.charAt(0).toUpperCase() + part.slice(1)
-  ).join(' ');
+  const [firstName, lastName] = slug.includes('-') 
+    ? slug.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    : [slug.charAt(0).toUpperCase() + slug.slice(1), ''];
 
   useEffect(() => {
     const initializeData = async () => {
@@ -34,12 +34,20 @@ export default function ProfilePage() {
         return;
       }
 
-      // Find user by first and last name
+      // Find user by first and last name (handle both cases)
       const users = await getUsers();
-      const foundUser = users.find(u => 
-        u.firstName.toLowerCase() === firstName.toLowerCase() && 
-        u.lastName.toLowerCase() === lastName.toLowerCase()
-      );
+      const foundUser = users.find(u => {
+        const userFirstName = u.firstName.toLowerCase();
+        const userLastName = u.lastName ? u.lastName.toLowerCase() : '';
+        
+        if (lastName) {
+          // Two-name slug: match both first and last
+          return userFirstName === firstName.toLowerCase() && userLastName === lastName.toLowerCase();
+        } else {
+          // Single-name slug: match first name only
+          return userFirstName === firstName.toLowerCase() && !userLastName;
+        }
+      });
 
       if (foundUser) {
         setUser(foundUser);
@@ -179,11 +187,11 @@ export default function ProfilePage() {
                 <Calendar size={16} color="#94a3b8" />
                 <span style={{ fontSize: '0.95rem', color: '#64748b' }}>Born:</span>
                 <span style={{ fontSize: '0.95rem', color: '#1e293b' }}>
-                  {new Date(user.dob).toLocaleDateString('en-US', { 
+                  {user.dob ? new Date(user.dob).toLocaleDateString('en-US', { 
                     year: 'numeric', 
                     month: 'long', 
                     day: 'numeric' 
-                  })}
+                  }) : 'Not provided'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -202,57 +210,34 @@ export default function ProfilePage() {
                   })}
                 </span>
               </div>
+              {user.isAdmin && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '0.95rem', color: '#64748b' }}>Status:</span>
+                  <span style={{ fontSize: '0.95rem', color: '#dc2626', fontWeight: 'bold' }}>👑 Admin</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Actions */}
+          {/* User Info */}
           <div>
             <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 'bold', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MessageCircle size={18} color="#0284c7" />
-              Actions
+              <User size={18} color="#0284c7" />
+              User Information
             </h3>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button 
-                onClick={() => router.push('/chat')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--sandy-brown)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <MessageCircle size={18} />
-                Send Message
-              </button>
-              <button 
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  backgroundColor: '#f1f5f9',
-                  color: '#64748b',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {user.alias && (
+                <div style={{ 
+                  padding: '0.75rem', 
+                  backgroundColor: '#f8fafc', 
+                  borderRadius: '8px', 
                   border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <Heart size={18} />
-                Add Friend
-              </button>
+                  textAlign: 'center'
+                }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Username:</span>
+                  <span style={{ fontSize: '0.95rem', color: '#1e293b', fontWeight: 'bold', marginLeft: '0.5rem' }}>@{user.alias}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
