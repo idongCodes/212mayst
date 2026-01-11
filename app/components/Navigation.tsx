@@ -12,6 +12,12 @@ import { useEffect, useState, useRef } from "react";
 import { addChat, getChats, ChatMessage, getUsers } from "../actions"; 
 import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
 
+// Check if the environment is server-side
+const isServerSide = typeof window === "undefined";
+
+// Conditionally import revalidatePath based on the environment
+const revalidatePath = isServerSide ? require('next/cache').revalidatePath : null;
+
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
 const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
 
@@ -134,7 +140,7 @@ export default function Navigation() {
     }
   }, [messages, isChatOpen, isNearBottom]);
 
-  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); };
+  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); revalidatePath('/'); };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
