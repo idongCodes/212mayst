@@ -1,8 +1,4 @@
-/**
- * file: app/actions.ts
- * description: Fixed TypeScript error by changing 'null' to 'undefined' for profile pics.
- */
-
+// file: app/actions.ts
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -42,9 +38,11 @@ export type Praise = {
   subject: string;
   message: string;
   submittedAt?: string;
+  userImage?: string | null; // Added this field
 };
 
 export async function getPraises(): Promise<Praise[]> {
+  // We explicitly select user_image here
   const { data, error } = await supabase
     .from('praises')
     .select('*')
@@ -61,18 +59,22 @@ export async function getPraises(): Promise<Praise[]> {
     role: p.role,
     subject: p.subject,
     message: p.message,
-    submittedAt: p.submitted_at
+    submittedAt: p.submitted_at,
+    userImage: p.user_image // Map the DB column 'user_image' to our code 'userImage'
   }));
 }
 
 export async function addPraise(newPraise: Praise) {
   const { error } = await supabase.from('praises').insert({
+    // If your DB autoincrements ID, you can remove 'id' here, 
+    // otherwise keep it if you generate it on the frontend.
     id: newPraise.id, 
     name: newPraise.name,
     role: newPraise.role,
     subject: newPraise.subject,
     message: newPraise.message,
-    submitted_at: newPraise.submittedAt || new Date().toISOString()
+    submitted_at: newPraise.submittedAt || new Date().toISOString(),
+    user_image: newPraise.userImage || null // Save the image URL to Supabase
   });
 
   if (error) console.error("Supabase error (addPraise):", error);
@@ -225,7 +227,7 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
   const cleanPhone = normalizePhone(formData.phone);
 
   const newUser = {
-    id: Date.now(),
+    // id: Date.now(), // Supabase usually handles IDs automatically. Uncomment if needed.
     first_name: formData.firstName,
     last_name: formData.lastName,
     alias: formData.alias || "",
@@ -237,7 +239,7 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     is_admin: false
   };
 
-  const { error } = await supabase.from('users').insert(newUser);
+  const { error, data } = await supabase.from('users').insert(newUser).select().single();
 
   if (error) {
     if (error.code === '23505') return { success: false, message: "Phone number already registered." };
@@ -246,18 +248,21 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
   
   revalidatePath("/mates");
   
+  // Return the newly created user (with the ID assigned by Supabase if applicable)
+  const createdUser = data || newUser;
+
   return { 
     success: true, 
     user: {
-      id: Number(newUser.id),
-      firstName: newUser.first_name,
-      lastName: newUser.last_name,
-      alias: newUser.alias,
-      dob: newUser.dob,
-      role: newUser.role,
-      phone: newUser.phone,
-      profilePic: newUser.profile_pic,
-      joinedAt: newUser.joined_at,
+      id: Number(createdUser.id),
+      firstName: createdUser.first_name,
+      lastName: createdUser.last_name,
+      alias: createdUser.alias,
+      dob: createdUser.dob,
+      role: createdUser.role,
+      phone: createdUser.phone,
+      profilePic: createdUser.profile_pic,
+      joinedAt: createdUser.joined_at,
       isAdmin: false
     } 
   };
@@ -360,14 +365,14 @@ export async function getPosts(): Promise<Post[]> {
     image: p.image_url,
     video: p.video_url,
     editCount: p.edit_count || 0,
-    authorProfilePic: userMap[p.author] || undefined, // FIX: Use undefined instead of null
+    authorProfilePic: userMap[p.author] || undefined, 
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
       content: r.content,
       timestamp: r.timestamp,
       editCount: r.edit_count || 0,
-      authorProfilePic: userMap[r.author] || undefined // FIX: Use undefined instead of null
+      authorProfilePic: userMap[r.author] || undefined 
     })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }));
 }
@@ -390,7 +395,7 @@ export async function addPost(newPost: Post) {
 
 export async function addReply(postId: number, content: string, author: string) {
   const newReply = {
-    id: Date.now(),
+    // id: Date.now(), // Uncomment if you are generating IDs manually
     post_id: postId,
     author: author,
     content: content,
@@ -554,7 +559,7 @@ export async function getChats(): Promise<ChatMessage[]> {
 
 export async function addChat(text: string, author: string) {
   const newChat = {
-    id: Date.now(),
+    // id: Date.now(),
     author,
     text,
     timestamp: new Date().toISOString()
