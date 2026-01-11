@@ -105,3 +105,19 @@ a {
   background-color: white;
   color: var(--sky-blue); /* Text turns blue on white background */
 }
+
+/* Chat Popup Animation */
+@keyframes chatBounceIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}

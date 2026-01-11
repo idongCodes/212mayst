@@ -138,7 +138,27 @@ export default function Navigation() {
     };
   }, [isLoggedIn, isNearBottom]);
 
-  // 5. Scroll Logic
+  // 5. Click outside to close chat
+  const chatPopupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if clicking on navigation bar
+      const navElement = document.querySelector('nav');
+      if (navElement && navElement.contains(event.target as Node)) {
+        return;
+      }
+      
+      if (chatPopupRef.current && !chatPopupRef.current.contains(event.target as Node)) {
+        setIsChatOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isChatOpen]);
   const handleScroll = () => {
     if (!chatContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
@@ -247,6 +267,7 @@ export default function Navigation() {
             <Link href="/mates" style={getLinkStyle("/mates")} title="Mates"><Users size={24} /></Link>
             <Link href="/notifications" style={getLinkStyle("/notifications")} title="Notifications"><Bell size={24} /></Link>
             <Link href="/about" style={getLinkStyle("/about")} title="About"><Info size={24} /></Link>
+            <button onClick={() => setIsChatOpen(!isChatOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isChatOpen ? 'var(--sandy-brown)' : '#9ca3af', padding: 0 }} title="Chat"><MessageCircle size={24} /></button>
           </>
         )}
         <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
@@ -261,7 +282,25 @@ export default function Navigation() {
       {isLoggedIn && !isChatPage && (
         <>
           {isChatOpen && (
-            <div className="animate-fade-in" style={{ position: 'fixed', bottom: '8rem', right: '1rem', width: '320px', height: '450px', backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', zIndex: 101, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+            <div style={{ 
+              position: 'fixed', 
+              bottom: '5.5rem', 
+              left: '50%', 
+              transform: 'translateX(-50%) scale(0.9)', 
+              width: '420px', 
+              height: '600px', 
+              backgroundColor: 'white', 
+              borderRadius: '20px', 
+              boxShadow: '0 10px 40px rgba(0,0,0,0.15)', 
+              zIndex: 101, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              overflow: 'hidden', 
+              border: '1px solid #e2e8f0',
+              animation: 'chatBounceIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards',
+              opacity: 0
+            }} 
+            ref={chatPopupRef}>
               
               {/* TOP BAR */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', backgroundColor: 'var(--sky-blue)', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
@@ -271,7 +310,6 @@ export default function Navigation() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                   <button onClick={() => setIsChatOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white', padding: 0 }}><Minus size={20} /></button>
-                  <button onClick={() => router.push('/chat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white', padding: 0 }}><Maximize2 size={18} /></button>
                 </div>
               </div>
 
@@ -318,15 +356,13 @@ export default function Navigation() {
 
                         {/* MESSAGE */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
-                          {!isMe && (
-                            <ClickableUser 
-                              user={users.find(u => u.firstName === msg.author || u.alias === msg.author) || { firstName: msg.author, lastName: '' }} 
-                              currentUser={currentUser}
-                              style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px', cursor: 'pointer' }}
-                            >
-                              {msg.author}
-                            </ClickableUser>
-                          )}
+                          <ClickableUser 
+                            user={users.find(u => u.firstName === msg.author || u.alias === msg.author) || { firstName: msg.author, lastName: '' }} 
+                            currentUser={currentUser}
+                            style={{ fontSize: '0.7rem', color: isMe ? '#94a3b8' : '#64748b', marginBottom: '2px', marginLeft: isMe ? '4px' : '4px', cursor: 'pointer' }}
+                          >
+                            {msg.author}
+                          </ClickableUser>
                           
                           {/* ADMIN CONTROLS */}
                           {isAdmin && !isEditing && (
@@ -427,6 +463,7 @@ export default function Navigation() {
                           ) : (
                             <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
                           )}
+                          <span style={{ fontSize: '0.7rem', color: '#cbd5e1', marginTop: '4px', margin: '0 4px' }}>{new Date(msg.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                       </div>
                     );
@@ -450,10 +487,6 @@ export default function Navigation() {
               </div>
             </div>
           )}
-
-          <button onClick={() => setIsChatOpen(!isChatOpen)} style={{ position: 'fixed', bottom: '6rem', right: '1rem', zIndex: 100, height: '56px', width: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: isChatOpen ? '#ef4444' : 'var(--light-green)', color: 'white', borderRadius: '50%', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: '2px solid white', cursor: 'pointer', transition: 'all 0.2s ease' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-            {isChatOpen ? <X size={28} /> : <MessageCircle size={28} />}
-          </button>
         </>
       )}
     </>
