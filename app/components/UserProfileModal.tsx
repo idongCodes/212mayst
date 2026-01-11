@@ -5,8 +5,7 @@
 
 "use client";
 
-import { useState } from 'react';
-import { X, Calendar, Phone, Home, User, MessageCircle, Heart } from 'lucide-react';
+import { X, Calendar, Phone, Home, User } from 'lucide-react';
 
 interface UserProfileModalProps {
   user: any;
@@ -17,12 +16,6 @@ interface UserProfileModalProps {
 
 export default function UserProfileModal({ user, isOpen, onClose, currentUser }: UserProfileModalProps) {
   if (!isOpen || !user) return null;
-
-  const handleSendMessage = () => {
-    onClose();
-    // Navigate to chat (could be enhanced to pre-fill message)
-    window.location.href = '/chat';
-  };
 
   return (
     <div style={{
@@ -137,51 +130,6 @@ export default function UserProfileModal({ user, isOpen, onClose, currentUser }:
               })}
             </span>
           </div>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={handleSendMessage}
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              backgroundColor: 'var(--sandy-brown)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <MessageCircle size={16} />
-            Message
-          </button>
-          <button
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              backgroundColor: '#f1f5f9',
-              color: '#64748b',
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <Heart size={16} />
-            Friend
-          </button>
         </div>
       </div>
     </div>
