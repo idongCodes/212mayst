@@ -88,8 +88,23 @@ export default function Join() {
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#f0f9ff' }}>
-      <div className="animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+    <main style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      padding: '1rem', 
+      backgroundColor: '#f0f9ff',
+      width: '100%',
+      boxSizing: 'border-box',
+      overflowX: 'hidden'
+    }}>
+      <div className="animate-fade-in" style={{ 
+        width: '100%', 
+        maxWidth: '400px',
+        boxSizing: 'border-box'
+      }}>
         
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
@@ -100,21 +115,62 @@ export default function Join() {
           <p style={{ color: '#64748b' }}>Enter your info to get access.</p>
         </div>
 
-        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0', transition: 'border-color 0.3s' }}>
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '1.5rem', 
+          borderRadius: '24px', 
+          boxShadow: '0 20px 40px rgba(0,0,0,0.05)', 
+          border: status === 'error' ? '2px solid #ef4444' : '1px solid #e2e8f0', 
+          transition: 'border-color 0.3s',
+          boxSizing: 'border-box',
+          width: '100%',
+          overflow: 'hidden'
+        }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
             {/* Name Fields */}
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem',
+              flexDirection: 'row',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ 
+                flex: 1, 
+                minWidth: '0',
+                boxSizing: 'border-box'
+              }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>First Name</label>
                 <div style={{ position: 'relative' }}>
                   <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+                  <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} style={{ 
+                    width: '100%', 
+                    padding: '12px 12px 12px 40px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #cbd5e1', 
+                    fontSize: '1rem', 
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    minWidth: 0
+                  }} />
                 </div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ 
+                flex: 1, 
+                minWidth: '0',
+                boxSizing: 'border-box'
+              }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Last Name</label>
-                <input type="text" name="lastName" placeholder="Doe" required value={formData.lastName} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} />
+                <input type="text" name="lastName" placeholder="Doe" required value={formData.lastName} onChange={handleChange} style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #cbd5e1', 
+                  fontSize: '1rem', 
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  minWidth: 0
+                }} />
               </div>
             </div>
 
@@ -140,9 +196,30 @@ export default function Join() {
             </div>
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#475569', marginBottom: '5px', display: 'block' }}>Date of Birth</label>
-              <div style={{ position: 'relative' }}>
-                <Calendar size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input type="date" name="dob" required value={formData.dob} onChange={handleChange} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', color: '#1e293b' }} />
+              <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+                <Calendar size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 1 }} />
+                <input 
+                  type="date" 
+                  name="dob" 
+                  required 
+                  value={formData.dob} 
+                  onChange={handleChange} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '14px 12px 14px 40px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #cbd5e1', 
+                    fontSize: '1rem', 
+                    outline: 'none', 
+                    color: '#1e293b',
+                    boxSizing: 'border-box',
+                    minWidth: 0,
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'textfield',
+                    height: '48px',
+                    lineHeight: '1.2'
+                  }} 
+                />
               </div>
             </div>
             <div>
