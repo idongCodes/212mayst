@@ -1,31 +1,36 @@
 /**
  * file: app/common-room/page.tsx
- * description: Added image upload, preview, and rendering for posts.
+ * description: Updated to 200MB limit and 30s video duration.
  */
 
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Image as ImageIcon, Smile, User, Pencil, X, Check, Trash2, MessageSquare } from 'lucide-react';
+import { Send, Camera, Image as ImageIcon, Video, Smile, User, Pencil, X, Check, Trash2, MessageSquare, AlertCircle } from 'lucide-react';
 import { addPost, getPosts, editPost, deletePost, addReply, Post } from '../actions';
 import Link from 'next/link';
 
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
 const MAX_CHARS = 250;
+const MAX_FILE_SIZE_MB = 200; // <--- Updated to 200MB
+const MAX_VIDEO_DURATION_SEC = 30; // <--- Updated to 30 Seconds
 
 export default function CommonRoom() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string>(""); // <--- New State for Image
+  
+  // Media State
+  const [selectedMedia, setSelectedMedia] = useState<string>(""); 
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [mediaError, setMediaError] = useState("");
+
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Edit State
+  // Edit & Reply State
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
-
-  // Reply State
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
@@ -35,8 +40,10 @@ export default function CommonRoom() {
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false); 
 
+  // Refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -73,28 +80,97 @@ export default function CommonRoom() {
 
   useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
 
+  // --- HANDLERS ---
+
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
-  
-  // Handle Image Selection
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleVideoClick = () => videoInputRef.current?.click();
+
+  // Helper: Compress Image
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
-      };
       reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const maxWidth = 800; // Resize to max 800px width
+          const scaleSize = maxWidth / img.width;
+          canvas.width = maxWidth;
+          canvas.height = img.height * scaleSize;
+          
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Compress quality to 0.7
+            resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+          } else {
+            reject("Canvas Error");
+          }
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Handle Media Selection (Image or Video)
+  const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMediaError("");
+
+    // 1. Size Check
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > MAX_FILE_SIZE_MB) {
+      setMediaError(`File too large (${fileSizeMB.toFixed(1)}MB). Max limit is ${MAX_FILE_SIZE_MB}MB.`);
+      e.target.value = ""; // Reset
+      return;
+    }
+
+    if (type === 'video') {
+      // 2. Video Duration Check
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      videoElement.src = URL.createObjectURL(file);
+      
+      videoElement.onloadedmetadata = () => {
+        URL.revokeObjectURL(videoElement.src);
+        if (videoElement.duration > MAX_VIDEO_DURATION_SEC + 0.5) { // Allow slight buffer
+          setMediaError(`Video too long (${Math.round(videoElement.duration)}s). Max ${MAX_VIDEO_DURATION_SEC} seconds.`);
+          e.target.value = "";
+          return;
+        } else {
+          // Process Video
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSelectedMedia(reader.result as string);
+            setMediaType('video');
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+    } else {
+      // 3. Image Compression
+      try {
+        const compressedBase64 = await compressImage(file);
+        setSelectedMedia(compressedBase64);
+        setMediaType('image');
+      } catch (err) {
+        setMediaError("Failed to process image.");
+      }
     }
   };
 
   const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
-  
   const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
 
   const handlePostSubmit = async () => {
-    if (!message.trim() && !selectedImage) return; // Allow empty text if image exists
+    if (!message.trim() && !selectedMedia) return;
     setLoading(true);
+    
     const newPost: Post = { 
       id: Date.now(), 
       author: authorName, 
@@ -102,13 +178,19 @@ export default function CommonRoom() {
       timestamp: new Date().toISOString(), 
       editCount: 0, 
       replies: [],
-      image: selectedImage // Add Image
+      // Assign to correct field
+      image: mediaType === 'image' ? selectedMedia : undefined,
+      video: mediaType === 'video' ? selectedMedia : undefined
     };
+
     setPosts([newPost, ...posts]);
     setMessage("");
-    setSelectedImage(""); // Clear image
+    setSelectedMedia(""); 
+    setMediaType(null);
+    setMediaError("");
     setShowEmojiPicker(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    
     await addPost(newPost);
     setLoading(false);
   };
@@ -116,31 +198,17 @@ export default function CommonRoom() {
   const handleReplySubmit = async (postId: number) => {
     if (!replyText.trim()) return;
     setReplyLoading(true);
-    
-    const newReply = {
-      id: Date.now(),
-      author: authorName,
-      content: replyText.trim(),
-      timestamp: new Date().toISOString()
-    };
-
-    const updatedPosts = posts.map(p => {
-      if (p.id === postId) {
-        return { ...p, replies: [...(p.replies || []), newReply] };
-      }
-      return p;
-    });
+    const newReply = { id: Date.now(), author: authorName, content: replyText.trim(), timestamp: new Date().toISOString() };
+    const updatedPosts = posts.map(p => { if (p.id === postId) { return { ...p, replies: [...(p.replies || []), newReply] }; } return p; });
     setPosts(updatedPosts);
     setReplyText("");
     setReplyingToId(null);
     setShowReplyEmojiPicker(false);
-
     await addReply(postId, newReply.content, authorName);
     setReplyLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
-  
   const handleReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, postId: number) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReplySubmit(postId); } };
 
   const isEditable = (post: Post) => {
@@ -172,14 +240,7 @@ export default function CommonRoom() {
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit' 
-    }) + ', ' + date.toLocaleTimeString('en-US', {
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -196,18 +257,30 @@ export default function CommonRoom() {
 
         {/* Input Area */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
+          
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
               <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
               
-              {/* IMAGE PREVIEW */}
-              {selectedImage && (
+              {/* MEDIA PREVIEW */}
+              {selectedMedia && (
                 <div className="animate-fade-in" style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}>
-                  <img src={selectedImage} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
-                  <button onClick={() => setSelectedImage("")} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
+                  {mediaType === 'image' ? (
+                    <img src={selectedMedia} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
+                  ) : (
+                    <video src={selectedMedia} controls style={{ maxHeight: '200px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
+                  )}
+                  <button onClick={() => { setSelectedMedia(""); setMediaType(null); }} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
                     <X size={14} />
                   </button>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {mediaError && (
+                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', color: '#ef4444', fontSize: '0.85rem' }}>
+                  <AlertCircle size={14} /> {mediaError}
                 </div>
               )}
 
@@ -221,15 +294,20 @@ export default function CommonRoom() {
                 </>
               )}
             </div>
-            <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedImage)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedImage) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
+            <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedMedia)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedMedia) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
           </div>
+          
+          {/* Action Bar */}
           <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
-            <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><Camera size={24} /></div>
-            <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><ImageIcon size={24} /></div>
+            <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Take Photo"><Camera size={24} /></div>
+            <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Image"><ImageIcon size={24} /></div>
+            <div onClick={handleVideoClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Video (30s max)"><Video size={24} /></div>
           </div>
-          {/* File Inputs with Listeners */}
-          <input type="file" ref={cameraInputRef} onChange={handleImageSelect} accept="image/*" capture="environment" hidden />
-          <input type="file" ref={uploadInputRef} onChange={handleImageSelect} accept="image/*" hidden />
+          
+          {/* Hidden Inputs */}
+          <input type="file" ref={cameraInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" capture="environment" hidden />
+          <input type="file" ref={uploadInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" hidden />
+          <input type="file" ref={videoInputRef} onChange={(e) => handleMediaSelect(e, 'video')} accept="video/*" hidden />
         </div>
 
         {/* Feed */}
@@ -241,7 +319,6 @@ export default function CommonRoom() {
               </div>
               <div style={{ flex: 1 }}>
                 
-                {/* Post Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
@@ -260,7 +337,7 @@ export default function CommonRoom() {
                   </div>
                 </div>
 
-                {/* Post Content */}
+                {/* Content */}
                 {editingId === post.id ? (
                   <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
@@ -271,33 +348,32 @@ export default function CommonRoom() {
                   <>
                     <p style={{ margin: '0 0 10px 0', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
                     
-                    {/* Render Post Image */}
+                    {/* Render Image */}
                     {post.image && (
                       <div style={{ marginBottom: '10px' }}>
                         <img src={post.image} alt="Post Attachment" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px' }} />
                       </div>
                     )}
 
-                    {/* Reply Button */}
-                    <button 
-                      onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} 
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sandy-brown)', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', padding: 0 }}
-                    >
+                    {/* Render Video */}
+                    {post.video && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <video src={post.video} controls style={{ width: '100%', maxHeight: '400px', borderRadius: '12px', backgroundColor: 'black' }} />
+                      </div>
+                    )}
+
+                    <button onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sandy-brown)', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', padding: 0 }}>
                       <MessageSquare size={14} /> {replyingToId === post.id ? "Cancel Reply" : "Reply"}
                     </button>
                   </>
                 )}
 
-                {/* Reply Input (Same as previous) */}
+                {/* Reply Input */}
                 {replyingToId === post.id && (
                   <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {showReplyEmojiPicker && (
                       <div style={{ marginBottom: '5px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(30px, 1fr))', gap: '5px', width: '100%', maxHeight: '150px', overflowY: 'auto' }}>
-                        {COMMON_EMOJIS.map((emoji) => (
-                          <button key={emoji} onClick={() => handleReplyEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {emoji}
-                          </button>
-                        ))}
+                        {COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleReplyEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>

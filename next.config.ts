@@ -1,6 +1,6 @@
 /**
  * file: next.config.ts
- * description: Increased Server Actions body limit to 10MB to allow image uploads.
+ * description: Increased Server Actions body limit to 200MB for larger video uploads.
  */
 
 import type { NextConfig } from "next";
@@ -8,7 +8,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb', // Increased from default 1MB
+      bodySizeLimit: '200mb', // Increased to 200MB
     },
   },
 };
