@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2, Pencil, Check, X } from "lucide-react";
 import { getPraises, addPraise, addFeedback, deletePraise, editPraise, Praise } from "./actions";
+import gitData from "./git-updates.json";
 
 function FadeInSection({ children }: { children: React.ReactNode }) {
   const [isVisible, setIsVisible] = useState(false);
@@ -36,6 +37,37 @@ export default function Home() {
   const [userPhone, setUserPhone] = useState(""); 
   const [editingPraiseId, setEditingPraiseId] = useState<number | null>(null);
   const [editPraiseData, setEditPraiseData] = useState({ subject: "", message: "" });
+
+  // 1. Add state for the summary
+const [aiUpdates, setAiUpdates] = useState<string[]>([]);
+const [loadingUpdates, setLoadingUpdates] = useState(true);
+
+// 2. Add this useEffect to fetch the AI summary
+useEffect(() => {
+  const fetchAiUpdates = async () => {
+    try {
+      // 2. Use the imported data directly
+      const rawUpdates = gitData.commits; 
+
+      const res = await fetch('/api/updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawUpdates }),
+      });
+
+      const data = await res.json();
+      if (data.summary) {
+        setAiUpdates(data.summary);
+      }
+    } catch (e) {
+      console.error("Failed to fetch AI updates", e);
+    } finally {
+      setLoadingUpdates(false);
+    }
+  };
+
+  fetchAiUpdates();
+}, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -336,13 +368,31 @@ export default function Home() {
       </FadeInSection>
       
       <FadeInSection>
-        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>What's New?</h2>
-            <p style={{ color: 'gray' }}>Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.</p>
-          </div>
-        </section>
-      </FadeInSection>
+  <section style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
+    <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+        <h2 style={{ color: 'var(--sandy-brown)', fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>What's New?</h2>
+        <span style={{ fontSize: '0.75rem', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+          AI Generated ✨
+        </span>
+      </div>
+      
+      {loadingUpdates ? (
+        <p style={{ color: 'gray', fontStyle: 'italic' }}>Asking Gemini what changed...</p>
+      ) : (
+        <ul style={{ paddingLeft: '1.2rem', color: 'gray', lineHeight: '1.8' }}>
+          {aiUpdates.map((update, index) => (
+            <li key={index} style={{ marginBottom: '5px' }}>{update}</li>
+          ))}
+        </ul>
+      )}
+      
+      <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '1.5rem' }}>
+        Check the <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Common Room</span> to see who's around, or visit <span style={{ color: 'var(--sky-blue)', fontWeight: 'bold' }}>Mates</span> to see what everyone is up to.
+      </p>
+    </div>
+  </section>
+</FadeInSection>
 
     </main>
   );
