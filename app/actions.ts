@@ -1,6 +1,6 @@
 /**
  * file: app/actions.ts
- * description: Added phone number normalization to Register and Login actions.
+ * description: Complete Server Actions with secure Database-driven Admin verification.
  */
 
 "use server";
@@ -8,23 +8,31 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "./lib/supabaseClient";
 
-// ============================================================================
-// HELPER: PHONE NORMALIZATION
-// ============================================================================
+// --- HELPER: PHONE NORMALIZATION ---
 function normalizePhone(input: string): string {
-  // 1. Remove all non-numeric characters
   const cleaned = input.replace(/\D/g, '');
-
-  // 2. Handle US/Canada country codes (11 digits starting with 1)
   if (cleaned.length === 11 && cleaned.startsWith('1')) {
     return cleaned.substring(1);
   }
-
   return cleaned;
 }
 
+// --- HELPER: VERIFY ADMIN STATUS ---
+async function verifyAdmin(phone: string): Promise<boolean> {
+  if (!phone) return false;
+  const cleanPhone = normalizePhone(phone);
+  
+  const { data: user } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('phone', cleanPhone)
+    .single();
+    
+  return user?.is_admin === true;
+}
+
 // ============================================================================
-// 1. PRAISE SYSTEM
+// 1. PRAISE (TESTIMONIALS) SYSTEM
 // ============================================================================
 
 export type Praise = {
@@ -72,11 +80,33 @@ export async function addPraise(newPraise: Praise) {
   return getPraises();
 }
 
-export async function deletePraise(id: number) {
-  const { error } = await supabase.from('praises').delete().eq('id', id);
-  if (error) console.error("Supabase error (deletePraise):", error);
+// --- ADMIN EDIT PRAISE ---
+export async function editPraise(id: number, newSubject: string, newMessage: string, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase
+    .from('praises')
+    .update({ 
+      subject: newSubject,
+      message: newMessage
+    })
+    .eq('id', id);
+
+  if (error) return { success: false, message: "Failed to edit testimonial." };
   revalidatePath("/");
-  return getPraises();
+  return { success: true };
+}
+
+// --- ADMIN DELETE PRAISE ---
+export async function deletePraise(id: number, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase.from('praises').delete().eq('id', id);
+  if (error) return { success: false, message: "Database error." };
+  revalidatePath("/");
+  return { success: true };
 }
 
 
@@ -100,10 +130,7 @@ export async function getFeedback(): Promise<Feedback[]> {
     .select('*')
     .order('submitted_at', { ascending: false });
 
-  if (error) {
-    console.error("Supabase error (getFeedback):", error);
-    return [];
-  }
+  if (error) return [];
 
   return data.map((f: any) => ({
     id: Number(f.id),
@@ -161,6 +188,7 @@ export type User = {
   phone: string;
   joinedAt: string;
   profilePic?: string;
+  isAdmin: boolean;
 };
 
 type AuthResponse = {
@@ -171,11 +199,7 @@ type AuthResponse = {
 
 export async function getUsers(): Promise<User[]> {
   const { data, error } = await supabase.from('users').select('*');
-  
-  if (error) {
-    console.error("Supabase error (getUsers):", error);
-    return [];
-  }
+  if (error) return [];
 
   return data.map((u: any) => ({
     id: Number(u.id),
@@ -186,7 +210,8 @@ export async function getUsers(): Promise<User[]> {
     role: u.role,
     phone: u.phone,
     profilePic: u.profile_pic,
-    joinedAt: u.joined_at
+    joinedAt: u.joined_at,
+    isAdmin: u.is_admin || false
   }));
 }
 
@@ -197,7 +222,6 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
   }
 
-  // NORMALIZE PHONE
   const cleanPhone = normalizePhone(formData.phone);
 
   const newUser = {
@@ -207,19 +231,16 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     alias: formData.alias || "",
     dob: formData.dob, 
     role: formData.role,
-    phone: cleanPhone, // Save normalized phone
+    phone: cleanPhone,
     profile_pic: formData.profilePic || "",
-    joined_at: new Date().toISOString()
+    joined_at: new Date().toISOString(),
+    is_admin: false
   };
 
   const { error } = await supabase.from('users').insert(newUser);
 
   if (error) {
-    console.error("Register Error:", error);
-    // Handle Unique Constraint Violation (P2002 equivalent in Supabase)
-    if (error.code === '23505') {
-       return { success: false, message: "This phone number is already registered." };
-    }
+    if (error.code === '23505') return { success: false, message: "Phone number already registered." };
     return { success: false, message: "Registration failed." };
   }
   
@@ -236,7 +257,8 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
       role: newUser.role,
       phone: newUser.phone,
       profilePic: newUser.profile_pic,
-      joinedAt: newUser.joined_at
+      joinedAt: newUser.joined_at,
+      isAdmin: false
     } 
   };
 }
@@ -248,32 +270,33 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
     return { success: false, message: "❌ Incorrect Door Code." };
   }
 
-  // NORMALIZE PHONE
   const cleanPhone = normalizePhone(phone);
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('phone', cleanPhone) // Check against normalized DB value
+    .eq('phone', cleanPhone) 
     .single();
 
   if (error || !data) {
     return { success: false, message: "User not found. Check phone number or join first." };
   }
 
-  const user: User = {
-    id: Number(data.id),
-    firstName: data.first_name,
-    lastName: data.last_name,
-    alias: data.alias,
-    dob: data.dob,
-    role: data.role,
-    phone: data.phone,
-    profilePic: data.profile_pic,
-    joinedAt: data.joined_at
+  return { 
+    success: true, 
+    user: {
+      id: Number(data.id),
+      firstName: data.first_name,
+      lastName: data.last_name,
+      alias: data.alias,
+      dob: data.dob,
+      role: data.role,
+      phone: data.phone,
+      profilePic: data.profile_pic,
+      joinedAt: data.joined_at,
+      isAdmin: data.is_admin || false
+    }
   };
-
-  return { success: true, user };
 }
 
 
@@ -286,6 +309,7 @@ export type Reply = {
   author: string;
   content: string;
   timestamp: string;
+  editCount: number;
 };
 
 export type Post = {
@@ -308,10 +332,7 @@ export async function getPosts(): Promise<Post[]> {
     `)
     .order('timestamp', { ascending: false });
 
-  if (error) {
-    console.error("Supabase error (getPosts):", error);
-    return [];
-  }
+  if (error) return [];
 
   return data.map((p: any) => ({
     id: Number(p.id),
@@ -320,12 +341,13 @@ export async function getPosts(): Promise<Post[]> {
     timestamp: p.timestamp,
     image: p.image_url,
     video: p.video_url,
-    editCount: 0,
+    editCount: p.edit_count || 0,
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
       content: r.content,
-      timestamp: r.timestamp
+      timestamp: r.timestamp,
+      editCount: r.edit_count || 0
     })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }));
 }
@@ -337,7 +359,8 @@ export async function addPost(newPost: Post) {
     content: newPost.content,
     timestamp: newPost.timestamp,
     image_url: newPost.image || null,
-    video_url: newPost.video || null
+    video_url: newPost.video || null,
+    edit_count: 0
   });
 
   if (error) console.error("Supabase error (addPost):", error);
@@ -351,24 +374,62 @@ export async function addReply(postId: number, content: string, author: string) 
     post_id: postId,
     author: author,
     content: content,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    edit_count: 0
   };
 
   const { error } = await supabase.from('replies').insert(newReply);
-
-  if (error) {
-    console.error("Supabase error (addReply):", error);
-    return { success: false, message: "Failed to reply" };
-  }
+  if (error) return { success: false, message: "Failed to reply" };
 
   revalidatePath("/common-room");
   return { success: true };
 }
 
-export async function editPost(postId: number, newContent: string) {
+// --- EDIT REPLY ---
+export async function editReply(replyId: number, newContent: string, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  
+  const { data: reply } = await supabase.from('replies').select('*').eq('id', replyId).single();
+  if (!reply) return { success: false, message: "Reply not found" };
+
+  if (!isAdmin) {
+    if ((reply.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
+    const replyTime = new Date(reply.timestamp).getTime();
+    if ((Date.now() - replyTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." };
+  }
+
+  const { error } = await supabase
+    .from('replies')
+    .update({ 
+      content: newContent,
+      edit_count: (reply.edit_count || 0) + 1
+    })
+    .eq('id', replyId);
+
+  if (error) return { success: false, message: "Failed to edit reply" };
+  revalidatePath("/common-room");
+  return { success: true };
+}
+
+// --- EDIT POST ---
+export async function editPost(postId: number, newContent: string, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+
+  const { data: post } = await supabase.from('posts').select('*').eq('id', postId).single();
+  if (!post) return { success: false, message: "Post not found" };
+
+  if (!isAdmin) {
+    if ((post.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
+    const postTime = new Date(post.timestamp).getTime();
+    if ((Date.now() - postTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." }; 
+  }
+
   const { error } = await supabase
     .from('posts')
-    .update({ content: newContent })
+    .update({ 
+      content: newContent,
+      edit_count: (post.edit_count || 0) + 1
+    })
     .eq('id', postId);
 
   if (error) return { success: false, message: "Failed to edit" };
@@ -376,13 +437,60 @@ export async function editPost(postId: number, newContent: string) {
   return { success: true };
 }
 
-export async function deletePost(id: number) {
+// --- DELETE POST ---
+export async function deletePost(id: number, requestorPhone: string) {
+  const { data: user } = await supabase.from('users').eq('phone', normalizePhone(requestorPhone)).single();
+  const { data: post } = await supabase.from('posts').select('*').eq('id', id).single();
+  
+  if (!post || !user) return { success: false, message: "Not found" };
+
+  const isAdmin = user.is_admin === true;
+  const isAuthor = (post.author === user.alias) || (post.author === user.first_name);
+  
+  if (isAdmin) {
+    // Admin Allowed
+  } else if (isAuthor) {
+    const postTime = new Date(post.timestamp).getTime();
+    if ((Date.now() - postTime) > 10 * 60 * 1000) {
+      return { success: false, message: "⏳ Too late! You can only delete within 10 minutes." };
+    }
+  } else {
+    return { success: false, message: "🚫 Unauthorized." };
+  }
+
   const { error } = await supabase.from('posts').delete().eq('id', id);
-  if (error) console.error("Supabase error (deletePost):", error);
+  if (error) return { success: false, message: "Database error." };
   revalidatePath("/common-room");
-  return []; 
+  return { success: true };
 }
 
+// --- DELETE REPLY ---
+export async function deleteReply(id: number, requestorPhone: string) {
+  const { data: user } = await supabase.from('users').eq('phone', normalizePhone(requestorPhone)).single();
+  const { data: reply } = await supabase.from('replies').select('*').eq('id', id).single();
+  
+  if (!reply || !user) return { success: false, message: "Not found" };
+
+  const isAdmin = user.is_admin === true;
+  const isAuthor = (reply.author === user.alias) || (reply.author === user.first_name);
+
+  if (isAdmin) {
+     // Allowed
+  } else if (isAuthor) {
+    const replyTime = new Date(reply.timestamp).getTime();
+    if ((Date.now() - replyTime) > 10 * 60 * 1000) {
+      return { success: false, message: "⏳ Too late! You can only delete within 10 minutes." };
+    }
+  } else {
+    return { success: false, message: "🚫 Unauthorized." };
+  }
+
+  const { error } = await supabase.from('replies').delete().eq('id', id);
+  if (error) return { success: false, message: "Database error." };
+
+  revalidatePath("/common-room");
+  return { success: true };
+}
 
 // ============================================================================
 // 5. CHAT SYSTEM
