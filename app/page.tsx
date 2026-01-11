@@ -1,16 +1,15 @@
 /**
  * file: app/page.tsx
- * description: Testimonials now show mm/dd/yyyy date + time.
+ * description: Fixed Date/Button overlap by adding padding to the header.
  */
 
 "use client"; 
 
 import React, { useState, useEffect, useRef } from "react"; 
 import Link from "next/link";
-import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2 } from "lucide-react";
-import { getPraises, addPraise, addFeedback, deletePraise, Praise } from "./actions"; // Import Type
+import { MessageCircle, Calendar, ClipboardList, User, Send, Bug, Lightbulb, Lock, Star, Trash2, Pencil, Check, X } from "lucide-react";
+import { getPraises, addPraise, addFeedback, deletePraise, editPraise, Praise } from "./actions";
 
-// ... [FadeInSection and Imports] ...
 function FadeInSection({ children }: { children: React.ReactNode }) {
   const [isVisible, setIsVisible] = useState(false);
   const domRef = useRef<HTMLDivElement>(null);
@@ -33,6 +32,11 @@ export default function Home() {
   const [feedbackForm, setFeedbackForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
   const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
 
+  // --- ADMIN STATE ---
+  const [userPhone, setUserPhone] = useState(""); 
+  const [editingPraiseId, setEditingPraiseId] = useState<number | null>(null);
+  const [editPraiseData, setEditPraiseData] = useState({ subject: "", message: "" });
+
   useEffect(() => {
     const loadData = async () => {
       const data = await getPraises();
@@ -43,7 +47,11 @@ export default function Home() {
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        if (parsedUser.alias === 'idongcodes') setIsAdmin(true);
+        setUserPhone(parsedUser.phone); // Capture Phone
+        
+        // Admin Check
+        if (parsedUser.isAdmin || parsedUser.alias === 'idongcodes') setIsAdmin(true);
+        
         setPraiseForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
         setFeedbackForm(prev => ({ ...prev, name: parsedUser.firstName, role: parsedUser.role }));
       }
@@ -51,15 +59,16 @@ export default function Home() {
     loadData();
   }, []);
 
-  // ... [Handlers: handlePraiseChange, handleFeedbackChange, handlePraiseSubmit, handleDeletePraise, handleFeedbackSubmit] ...
   const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setPraiseForm(prev => ({ ...prev, [name]: value }));
   };
+  
   const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFeedbackForm(prev => ({ ...prev, [name]: value }));
   };
+  
   const handlePraiseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!praiseForm.name || !praiseForm.message) return;
@@ -68,11 +77,7 @@ export default function Home() {
     setPraiseForm({ name: user?.firstName || "", role: user?.role || "Tenant", subject: "", message: "" });
     await addPraise(newPraise);
   };
-  const handleDeletePraise = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this praise?")) return;
-    setPraises(praises.filter(p => p.id !== id));
-    await deletePraise(id);
-  };
+
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackForm.name || !feedbackForm.message) return;
@@ -84,24 +89,41 @@ export default function Home() {
     setTimeout(() => setFeedbackStatus("idle"), 3000);
   };
 
+  // --- ADMIN HANDLERS ---
+  const handleDeletePraise = async (id: number) => {
+    if (!confirm("Admin: Delete this testimonial?")) return;
+    setPraises(praises.filter(p => p.id !== id));
+    await deletePraise(id, userPhone);
+  };
+
+  const startEditing = (p: Praise) => {
+    setEditingPraiseId(p.id);
+    setEditPraiseData({ subject: p.subject, message: p.message });
+  };
+
+  const cancelEditing = () => {
+    setEditingPraiseId(null);
+    setEditPraiseData({ subject: "", message: "" });
+  };
+
+  const saveEdit = async (id: number) => {
+    if (!editPraiseData.message.trim()) return;
+    setPraises(praises.map(p => p.id === id ? { ...p, ...editPraiseData } : p));
+    setEditingPraiseId(null);
+    await editPraise(id, editPraiseData.subject, editPraiseData.message, userPhone);
+  };
+
   // HELPER: Date Formatter
   const formatDate = (isoString?: string) => {
     if (!isoString) return "";
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit' 
-    }) + ', ' + date.toLocaleTimeString('en-US', {
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* HERO & FEATURES SECTIONS (Unchanged, condensed for focus) */}
+      {/* HERO & FEATURES (Unchanged) */}
       <FadeInSection>
         <section style={{ position: 'relative', height: '70vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', overflow: 'hidden', padding: '0 2rem' }}>
           <div className="animate-fade-in" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
@@ -155,28 +177,55 @@ export default function Home() {
                     {praises.map((p) => (
                       <div key={p.id} style={{ position: 'relative', backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.6)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.1)', padding: '1.5rem', borderRadius: '15px' }}>
                         
-                        {isAdmin && (
-                          <button 
-                            onClick={() => handleDeletePraise(p.id)}
-                            style={{ position: 'absolute', top: '10px', right: '10px', background: 'white', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
-                            title="Delete Praise (Admin)"
-                          >
-                            <Trash2 size={16} color="#ef4444" />
-                          </button>
+                        {/* --- ADMIN BUTTONS --- */}
+                        {isAdmin && !editingPraiseId && (
+                          <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '8px', zIndex: 10 }}>
+                            <button onClick={() => startEditing(p)} style={{ background: 'white', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }} title="Edit">
+                              <Pencil size={16} color="#94a3b8" />
+                            </button>
+                            <button onClick={() => handleDeletePraise(p.id)} style={{ background: 'white', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }} title="Delete">
+                              <Trash2 size={16} color="#ef4444" />
+                            </button>
+                          </div>
                         )}
 
-                        <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717', margin: 0 }}>{p.subject}</h4>
-                          
-                          {/* DATE DISPLAY */}
-                          {p.submittedAt && (
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '10px' }}>
-                              {formatDate(p.submittedAt)}
-                            </span>
-                          )}
-                        </div>
+                        {/* --- CONTENT LOGIC --- */}
+                        {editingPraiseId === p.id ? (
+                          // EDIT MODE
+                          <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <input 
+                              value={editPraiseData.subject} 
+                              onChange={(e) => setEditPraiseData({...editPraiseData, subject: e.target.value})}
+                              style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 'bold' }} 
+                            />
+                            <textarea 
+                              value={editPraiseData.message} 
+                              onChange={(e) => setEditPraiseData({...editPraiseData, message: e.target.value})}
+                              rows={3}
+                              style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', fontFamily: 'inherit' }} 
+                            />
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                              <button onClick={() => saveEdit(p.id)} style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Check size={14}/> Save</button>
+                              <button onClick={cancelEditing} style={{ background: '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><X size={14}/> Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          // VIEW MODE (With Fix for Overlap)
+                          <>
+                            <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingRight: isAdmin ? '70px' : '0' }}>
+                              <h4 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#171717', margin: 0 }}>{p.subject}</h4>
+                              
+                              {p.submittedAt && (
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '10px', whiteSpace: 'nowrap' }}>
+                                  {formatDate(p.submittedAt)}
+                                </span>
+                              )}
+                            </div>
 
-                        <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
+                            <p style={{ color: '#374151', marginBottom: '1.5rem', fontStyle: 'italic', lineHeight: '1.5', fontWeight: '500' }}>"{p.message}"</p>
+                          </>
+                        )}
+
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', padding: '10px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#6b7280" /></div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -191,6 +240,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Praise Form (Unchanged) */}
             <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
               <h3 style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#171717' }}>Leave some Praise</h3>
               
@@ -254,7 +304,6 @@ export default function Home() {
               </div>
             ) : (
               <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', backgroundColor: '#334155', padding: '2rem', borderRadius: '20px', border: '1px solid #475569' }}>
-                {/* ... (Feedback Form inputs unchanged) ... */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                   <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>First Name</label>

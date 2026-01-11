@@ -103,24 +103,6 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/lib/supabaseClient.ts">
-/**
- * file: app/lib/supabaseClient.ts
- * description: Initializes the Supabase client for use throughout the app.
- */
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables. Check .env.local");
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-</file>
-
 <file path="app/components/AutoLogout.tsx">
 /**
  * file: app/components/AutoLogout.tsx
@@ -448,6 +430,24 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 export default function Contact() {
   return <div className="p-4 text-center">Contact</div>;
 }
+</file>
+
+<file path="app/lib/supabaseClient.ts">
+/**
+ * file: app/lib/supabaseClient.ts
+ * description: Initializes the Supabase client for use throughout the app.
+ */
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables. Check .env.local");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 </file>
 
 <file path="app/login/page.tsx">
@@ -2680,15 +2680,15 @@ export default function Home() {
 <file path="app/common-room/page.tsx">
 /**
  * file: app/common-room/page.tsx
- * description: Updated to upload media to Supabase Storage before creating a post.
+ * description: UI passes User Phone to actions for secure Admin/Permission verification.
  */
 
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Camera, Image as ImageIcon, Video, Smile, User, Pencil, X, Check, Trash2, MessageSquare, AlertCircle } from 'lucide-react';
-import { addPost, getPosts, editPost, deletePost, addReply, Post } from '../actions';
-import { supabase } from '../lib/supabaseClient'; // <--- Import Supabase Client
+import { addPost, getPosts, editPost, deletePost, addReply, editReply, deleteReply, Post, Reply } from '../actions';
+import { supabase } from '../lib/supabaseClient'; 
 import Link from 'next/link';
 
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
@@ -2700,8 +2700,7 @@ export default function CommonRoom() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
   
-  // Media State
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Store actual File object
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>(""); 
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [mediaError, setMediaError] = useState("");
@@ -2709,16 +2708,20 @@ export default function CommonRoom() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // ... [Edit & Reply State & Refs remain the same] ...
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
+  const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
+  const [editReplyText, setEditReplyText] = useState("");
+  const [saveReplyLoading, setSaveReplyLoading] = useState(false);
+
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
   
   const [authorName, setAuthorName] = useState("Guest");
+  const [userPhone, setUserPhone] = useState(""); // <--- Store Phone for API calls
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false); 
 
@@ -2740,12 +2743,16 @@ export default function CommonRoom() {
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setAuthorName(user.alias || user.firstName);
+      setUserPhone(user.phone); // <--- Capture Phone
       setIsGuest(false);
-      if (user.alias === 'idongcodes') setIsAdmin(true);
+      
+      // Admin Check via Session Flag (Mapped from DB)
+      if (user.isAdmin) {
+        setIsAdmin(true);
+      }
     }
   }, []);
 
-  // ... [useEffect hooks for auto-resize remain the same] ...
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; } }, [message]);
   useEffect(() => { if (replyTextareaRef.current) { replyTextareaRef.current.style.height = 'auto'; replyTextareaRef.current.style.height = `${replyTextareaRef.current.scrollHeight}px`; } }, [replyText, replyingToId]);
   useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
@@ -2753,204 +2760,155 @@ export default function CommonRoom() {
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
   const handleVideoClick = () => videoInputRef.current?.click();
-
-  // Handle Media Selection
   const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setMediaError("");
-
-    // 1. Size Check
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      setMediaError(`File too large (${fileSizeMB.toFixed(1)}MB). Max limit is ${MAX_FILE_SIZE_MB}MB.`);
-      e.target.value = ""; 
-      return;
-    }
-
-    // 2. Video Duration Check
+    if (fileSizeMB > MAX_FILE_SIZE_MB) { setMediaError(`File too large (${fileSizeMB.toFixed(1)}MB). Max limit is ${MAX_FILE_SIZE_MB}MB.`); e.target.value = ""; return; }
     if (type === 'video') {
       const videoElement = document.createElement('video');
       videoElement.preload = 'metadata';
       videoElement.src = URL.createObjectURL(file);
-      
-      videoElement.onloadedmetadata = () => {
-        URL.revokeObjectURL(videoElement.src);
-        if (videoElement.duration > MAX_VIDEO_DURATION_SEC + 1) { 
-          setMediaError(`Video too long (${Math.round(videoElement.duration)}s). Max ${MAX_VIDEO_DURATION_SEC} seconds.`);
-          e.target.value = "";
-          return;
-        } else {
-          // Success
-          setSelectedFile(file);
-          setPreviewUrl(URL.createObjectURL(file));
-          setMediaType('video');
-        }
-      };
-    } else {
-      // Image
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setMediaType('image');
-    }
+      videoElement.onloadedmetadata = () => { URL.revokeObjectURL(videoElement.src); if (videoElement.duration > MAX_VIDEO_DURATION_SEC + 1) { setMediaError(`Video too long (${Math.round(videoElement.duration)}s). Max ${MAX_VIDEO_DURATION_SEC} seconds.`); e.target.value = ""; return; } else { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); setMediaType('video'); } };
+    } else { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); setMediaType('image'); }
   };
 
   const handlePostSubmit = async () => {
     if (!message.trim() && !selectedFile) return;
     setLoading(true);
-
     let mediaUrl = "";
-
-    // 1. Upload to Supabase Storage if file exists
     if (selectedFile) {
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `posts/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('uploads') // Make sure this bucket exists in Supabase!
-        .upload(filePath, selectedFile);
-
-      if (uploadError) {
-        alert("Upload failed: " + uploadError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Get Public URL
+      const { error: uploadError } = await supabase.storage.from('uploads').upload(filePath, selectedFile);
+      if (uploadError) { alert("Upload failed: " + uploadError.message); setLoading(false); return; }
       const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
       mediaUrl = data.publicUrl;
     }
-    
-    // 2. Save Post to DB with URL
-    const newPost: Post = { 
-      id: Date.now(), 
-      author: authorName, 
-      content: message.trim(), 
-      timestamp: new Date().toISOString(), 
-      editCount: 0, 
-      replies: [],
-      image: mediaType === 'image' ? mediaUrl : undefined,
-      video: mediaType === 'video' ? mediaUrl : undefined
-    };
-
-    // Optimistic Update
+    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0, replies: [], image: mediaType === 'image' ? mediaUrl : undefined, video: mediaType === 'video' ? mediaUrl : undefined };
     setPosts([newPost, ...posts]);
-    
-    // Reset UI
-    setMessage("");
-    setSelectedFile(null);
-    setPreviewUrl("");
-    setMediaType(null);
-    setMediaError("");
-    setShowEmojiPicker(false);
+    setMessage(""); setSelectedFile(null); setPreviewUrl(""); setMediaType(null); setMediaError(""); setShowEmojiPicker(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    
     await addPost(newPost);
     setLoading(false);
   };
 
-  // ... [Rest of the handlers remain UNCHANGED] ...
   const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
   const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
   const handleReplySubmit = async (postId: number) => {
     if (!replyText.trim()) return;
     setReplyLoading(true);
-    const newReply = { id: Date.now(), author: authorName, content: replyText.trim(), timestamp: new Date().toISOString() };
+    const newReply = { id: Date.now(), author: authorName, content: replyText.trim(), timestamp: new Date().toISOString(), editCount: 0 };
     const updatedPosts = posts.map(p => { if (p.id === postId) { return { ...p, replies: [...(p.replies || []), newReply] }; } return p; });
     setPosts(updatedPosts);
-    setReplyText("");
-    setReplyingToId(null);
-    setShowReplyEmojiPicker(false);
+    setReplyText(""); setReplyingToId(null); setShowReplyEmojiPicker(false);
     await addReply(postId, newReply.content, authorName);
     setReplyLoading(false);
   };
+
+  // --- PERMISSION CHECKS ---
+  const isEditable = (item: Post | Reply) => {
+    if (isAdmin) return true; // Admin/Self always editable if using phone check on server
+    if (item.author === authorName) {
+      if ((item.editCount || 0) >= 1) return false;
+      return (Date.now() - new Date(item.timestamp).getTime()) < 15 * 60 * 1000;
+    }
+    return false;
+  };
+
+  const isDeletable = (item: Post | Reply) => {
+    if (isAdmin) return true; 
+    if (item.author !== authorName) return false;
+    return (Date.now() - new Date(item.timestamp).getTime()) < 10 * 60 * 1000;
+  };
+
+  // --- ACTIONS (Pass userPhone) ---
+  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); setReplyingToId(null); setEditingReplyId(null); };
+  const cancelEditing = () => { setEditingId(null); setEditText(""); };
+  const saveEdit = async () => { 
+    if (!editingId || !editText.trim()) return; 
+    setSaveLoading(true); 
+    // Pass userPhone for server verification
+    const result = await editPost(editingId, editText.trim(), userPhone); 
+    if (result.success) { setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p)); setEditingId(null); setEditText(""); } else { alert(result.message); setEditingId(null); } setSaveLoading(false); 
+  };
+  
+  const startEditingReply = (reply: Reply) => { setEditingReplyId(reply.id); setEditReplyText(reply.content); setEditingId(null); };
+  const cancelEditingReply = () => { setEditingReplyId(null); setEditReplyText(""); };
+  const saveReplyEdit = async () => { 
+    if (!editingReplyId || !editReplyText.trim()) return; 
+    setSaveReplyLoading(true); 
+    const result = await editReply(editingReplyId, editReplyText.trim(), userPhone); 
+    if (result.success) { setPosts(posts.map(p => ({ ...p, replies: p.replies?.map(r => r.id === editingReplyId ? { ...r, content: editReplyText.trim(), editCount: (r.editCount || 0) + 1 } : r) }))); setEditingReplyId(null); setEditReplyText(""); } else { alert(result.message); setEditingReplyId(null); } setSaveReplyLoading(false); 
+  };
+
+  const handleDeletePost = async (id: number) => {
+    if (!confirm("Delete post?")) return;
+    setPosts(posts.filter(p => p.id !== id));
+    // Pass userPhone for server verification
+    const result = await deletePost(id, userPhone);
+    if (!result.success) { alert(result.message); const data = await getPosts(); setPosts(data); }
+  };
+
+  const handleDeleteReply = async (id: number, postId: number) => {
+    if (!confirm("Delete reply?")) return;
+    setPosts(posts.map(p => p.id === postId ? { ...p, replies: p.replies?.filter(r => r.id !== id) } : p));
+    const result = await deleteReply(id, userPhone);
+    if (!result.success) { alert(result.message); const data = await getPosts(); setPosts(data); }
+  };
+
+  const formatDate = (isoString: string) => { const date = new Date(isoString); return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
   const handleReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, postId: number) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReplySubmit(postId); } };
-  const isEditable = (post: Post) => { if ((post.editCount || 0) >= 1) return false; return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000; };
-  const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); setReplyingToId(null); };
-  const cancelEditing = () => { setEditingId(null); setEditText(""); };
-  const saveEdit = async () => { if (!editingId || !editText.trim()) return; setSaveLoading(true); const result = await editPost(editingId, editText.trim()); if (result.success) { setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p)); setEditingId(null); setEditText(""); } else { alert(result.message); setEditingId(null); } setSaveLoading(false); };
-  const handleDeletePost = async (id: number) => { if (!confirm("Admin: Delete this post?")) return; setPosts(posts.filter(p => p.id !== id)); await deletePost(id); };
-  const formatDate = (isoString: string) => { const date = new Date(isoString); return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); };
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
-            {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
-          </h1>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>{isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}</h1>
           {isGuest ? <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p> : <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>}
         </div>
 
         {/* Input Area */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
-          
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
               <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
-              
-              {/* MEDIA PREVIEW */}
-              {previewUrl && (
-                <div className="animate-fade-in" style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}>
-                  {mediaType === 'image' ? (
-                    <img src={previewUrl} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
-                  ) : (
-                    <video src={previewUrl} controls style={{ maxHeight: '200px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
-                  )}
-                  <button onClick={() => { setSelectedFile(null); setPreviewUrl(""); setMediaType(null); }} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-
+              {previewUrl && ( <div className="animate-fade-in" style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}> {mediaType === 'image' ? ( <img src={previewUrl} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} /> ) : ( <video src={previewUrl} controls style={{ maxHeight: '200px', borderRadius: '12px', border: '2px solid #e2e8f0' }} /> )} <button onClick={() => { setSelectedFile(null); setPreviewUrl(""); setMediaType(null); }} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}><X size={14} /></button> </div> )}
               {mediaError && <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', color: '#ef4444', fontSize: '0.85rem' }}><AlertCircle size={14} /> {mediaError}</div>}
-
               <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
-              {showEmojiPicker && (
-                <>
-                  <div onClick={() => setShowEmojiPicker(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 40, cursor: 'default' }} />
-                  <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}
-                  </div>
-                </>
-              )}
+              {showEmojiPicker && ( <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(35px, 1fr))', gap: '5px', width: '100%', minWidth: '250px', maxWidth: '300px', maxHeight: '200px', overflowY: 'auto' }}>{COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}</div> )}
             </div>
             <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedFile)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedFile) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
           </div>
-          
           <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
             <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Take Photo"><Camera size={24} /></div>
             <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Image"><ImageIcon size={24} /></div>
             <div onClick={handleVideoClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Video (30s max)"><Video size={24} /></div>
           </div>
-          
           <input type="file" ref={cameraInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" capture="environment" hidden />
           <input type="file" ref={uploadInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" hidden />
           <input type="file" ref={videoInputRef} onChange={(e) => handleMediaSelect(e, 'video')} accept="video/*" hidden />
         </div>
 
-        {/* Feed (Rendering Logic Remains the Same) */}
+        {/* Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
               <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><User size={20} color="#0284c7" /></div>
               <div style={{ flex: 1 }}>
                 
-                {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    {!editingId && post.author === authorName && isEditable(post) && <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>}
-                    {isAdmin && <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>}
+                    {!editingId && isEditable(post) && <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit Post"><Pencil size={16} /></button>}
+                    {isDeletable(post) && <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Delete Post"><Trash2 size={16} /></button>}
                   </div>
                 </div>
 
@@ -2964,33 +2922,16 @@ export default function CommonRoom() {
                 ) : (
                   <>
                     <p style={{ margin: '0 0 10px 0', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
-                    
-                    {/* Render Media */}
-                    {post.image && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <img src={post.image} alt="Post Attachment" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px' }} />
-                      </div>
-                    )}
-                    {post.video && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <video src={post.video} controls style={{ width: '100%', maxHeight: '400px', borderRadius: '12px', backgroundColor: 'black' }} />
-                      </div>
-                    )}
-
-                    <button onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sandy-brown)', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', padding: 0 }}>
-                      <MessageSquare size={14} /> {replyingToId === post.id ? "Cancel Reply" : "Reply"}
-                    </button>
+                    {post.image && ( <div style={{ marginBottom: '10px' }}> <img src={post.image} alt="Post Attachment" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px' }} /> </div> )}
+                    {post.video && ( <div style={{ marginBottom: '10px' }}> <video src={post.video} controls style={{ width: '100%', maxHeight: '400px', borderRadius: '12px', backgroundColor: 'black' }} /> </div> )}
+                    <button onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sandy-brown)', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', padding: 0 }}><MessageSquare size={14} /> {replyingToId === post.id ? "Cancel Reply" : "Reply"}</button>
                   </>
                 )}
 
-                {/* Reply Input & List (Same as before) */}
+                {/* Reply Input */}
                 {replyingToId === post.id && (
                   <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {showReplyEmojiPicker && (
-                      <div style={{ marginBottom: '5px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(30px, 1fr))', gap: '5px', width: '100%', maxHeight: '150px', overflowY: 'auto' }}>
-                        {COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleReplyEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}
-                      </div>
-                    )}
+                    {showReplyEmojiPicker && ( <div style={{ marginBottom: '5px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(30px, 1fr))', gap: '5px', width: '100%', maxHeight: '150px', overflowY: 'auto' }}>{COMMON_EMOJIS.map((emoji) => <button key={emoji} onClick={() => handleReplyEmojiClick(emoji)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '5px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</button>)}</div> )}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                       <div style={{ position: 'relative', flex: 1 }}>
                         <textarea ref={replyTextareaRef} placeholder="Write a reply..." value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => handleReplyKeyDown(e, post.id)} autoFocus rows={1} style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none', backgroundColor: '#f8fafc', resize: 'none', overflow: 'hidden', minHeight: '40px', fontFamily: 'inherit' }} />
@@ -3000,20 +2941,33 @@ export default function CommonRoom() {
                     </div>
                   </div>
                 )}
+
+                {/* Render Replies */}
                 {post.replies && post.replies.length > 0 && (
                   <div style={{ marginTop: '1rem', borderLeft: '2px solid #f1f5f9', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {post.replies.map((reply) => (
                       <div key={reply.id} style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{reply.author}</span>
-                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{formatDate(reply.timestamp)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                             <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{reply.author}</span>
+                             <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{formatDate(reply.timestamp)}{(reply.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(Edited)</span>}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            {!editingReplyId && isEditable(reply) && <button onClick={() => startEditingReply(reply)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px' }} title="Edit Reply"><Pencil size={14} /></button>}
+                            {isDeletable(reply) && <button onClick={() => handleDeleteReply(reply.id, post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }} title="Delete Reply"><Trash2 size={14} /></button>}
+                          </div>
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p>
+                        {editingReplyId === reply.id ? (
+                           <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                             <input type="text" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveReplyEdit()} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--sky-blue)', outline: 'none', fontSize: '0.9rem' }} />
+                             <button onClick={saveReplyEdit} disabled={saveReplyLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#171717' }}><Check size={14} /></button>
+                             <button onClick={cancelEditingReply} style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#64748b' }}><X size={14} /></button>
+                           </div>
+                        ) : ( <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p> )}
                       </div>
                     ))}
                   </div>
                 )}
-
               </div>
             </div>
           ))}
@@ -3028,7 +2982,7 @@ export default function CommonRoom() {
 <file path="app/components/Navigation.tsx">
 /**
  * file: app/components/Navigation.tsx
- * description: Chat Popup now displays real profile pictures from registered users.
+ * description: Replaced Chat polling with Supabase Realtime subscription.
  */
 
 "use client";
@@ -3037,9 +2991,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { addChat, getChats, ChatMessage, getUsers, User } from "../actions"; // Import getUsers
+import { addChat, getChats, ChatMessage, getUsers } from "../actions"; 
+import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
 
-// ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
 const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
 
@@ -3058,7 +3012,7 @@ export default function Navigation() {
   const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
-  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "Base64Pic"
+  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "PicUrl"
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -3078,13 +3032,12 @@ export default function Navigation() {
     checkLogin();
   }, [pathname]);
 
-  // 2. Fetch User Avatars
+  // 2. Fetch User Avatars (Once on load)
   useEffect(() => {
     if (isLoggedIn) {
       getUsers().then(users => {
         const map: Record<string, string> = {};
         users.forEach(u => {
-          // Map both real name and alias to the profile pic
           if (u.profilePic) {
             map[u.firstName] = u.profilePic;
             if (u.alias) map[u.alias] = u.profilePic;
@@ -3103,22 +3056,51 @@ export default function Navigation() {
     prevPathRef.current = pathname;
   }, [pathname]);
 
-  // 4. Polling
+  // 4. SUPABASE REALTIME SUBSCRIPTION (Replaces Polling)
   useEffect(() => {
-    if (!isChatOpen) return;
-    const fetchMessages = async () => { 
-      const serverMessages = await getChats(); 
-      setMessages(current => {
-        if (JSON.stringify(current) !== JSON.stringify(serverMessages)) {
-          return serverMessages;
-        }
-        return current;
-      });
+    if (!isLoggedIn) return;
+
+    // A. Initial Load
+    const loadInitialMessages = async () => {
+      const initialChats = await getChats();
+      setMessages(initialChats);
     };
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
-  }, [isChatOpen]);
+    loadInitialMessages();
+
+    // B. Subscribe to "chats" table changes
+    const channel = supabase
+      .channel('realtime-chats')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chats' },
+        (payload) => {
+          // Payload contains the new row data
+          const newMsg = payload.new as any;
+          
+          setMessages((prev) => {
+            // Avoid duplicates if we optimistically added it already
+            if (prev.some(m => m.id === Number(newMsg.id))) return prev;
+            
+            return [...prev, {
+              id: Number(newMsg.id),
+              author: newMsg.author,
+              text: newMsg.text,
+              timestamp: newMsg.timestamp
+            }];
+          });
+
+          // Scroll on new message if near bottom
+          if (isNearBottom) {
+             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLoggedIn, isNearBottom]);
 
   // 5. Scroll Logic
   const handleScroll = () => {
@@ -3142,7 +3124,10 @@ export default function Navigation() {
     setMessageText(""); setShowEmojiPicker(false); setShowGifPicker(false);
     
     const authorName = currentUser.alias || currentUser.firstName;
-    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
+
+    // Optimistic Update (Show immediately)
+    const tempId = Date.now();
+    setMessages(prev => [...prev, { id: tempId, author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
     
     setIsNearBottom(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
@@ -3157,10 +3142,14 @@ export default function Navigation() {
     if (!currentUser) return; 
     const authorName = currentUser.alias || currentUser.firstName; 
     const gifText = `[GIF: ${label}]`; 
-    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    
+    const tempId = Date.now();
+    setMessages(prev => [...prev, { id: tempId, author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    
     setShowGifPicker(false); 
     setIsNearBottom(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    
     await addChat(gifText, authorName); 
   };
 
@@ -3255,7 +3244,7 @@ export default function Navigation() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* INPUT AREA (Same as before) */}
+              {/* INPUT AREA */}
               {showEmojiPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
               {showGifPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}</div>}
               <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>
@@ -3332,7 +3321,7 @@ export default function RootLayout({
 <file path="app/actions.ts">
 /**
  * file: app/actions.ts
- * description: Replaced local JSON storage with Supabase Database operations.
+ * description: Complete Server Actions with secure Database-driven Admin verification.
  */
 
 "use server";
@@ -3341,7 +3330,34 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "./lib/supabaseClient";
 
 // ============================================================================
-// 1. PRAISE SYSTEM
+// HELPER: PHONE NORMALIZATION
+// ============================================================================
+function normalizePhone(input: string): string {
+  const cleaned = input.replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return cleaned.substring(1);
+  }
+  return cleaned;
+}
+
+// ============================================================================
+// HELPER: VERIFY ADMIN STATUS
+// ============================================================================
+async function verifyAdmin(phone: string): Promise<boolean> {
+  if (!phone) return false;
+  const cleanPhone = normalizePhone(phone);
+  
+  const { data: user } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('phone', cleanPhone)
+    .single();
+    
+  return user?.is_admin === true;
+}
+
+// ============================================================================
+// 1. PRAISE (TESTIMONIALS) SYSTEM
 // ============================================================================
 
 export type Praise = {
@@ -3364,7 +3380,6 @@ export async function getPraises(): Promise<Praise[]> {
     return [];
   }
 
-  // Map DB snake_case to Frontend camelCase
   return data.map((p: any) => ({
     id: Number(p.id),
     name: p.name,
@@ -3377,7 +3392,6 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const { error } = await supabase.from('praises').insert({
-    // Let DB handle ID and Timestamp automatically if possible, or pass them
     id: newPraise.id, 
     name: newPraise.name,
     role: newPraise.role,
@@ -3391,11 +3405,36 @@ export async function addPraise(newPraise: Praise) {
   return getPraises();
 }
 
-export async function deletePraise(id: number) {
-  const { error } = await supabase.from('praises').delete().eq('id', id);
-  if (error) console.error("Supabase error (deletePraise):", error);
+// --- ADMIN EDIT PRAISE ---
+export async function editPraise(id: number, newSubject: string, newMessage: string, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase
+    .from('praises')
+    .update({ 
+      subject: newSubject,
+      message: newMessage
+    })
+    .eq('id', id);
+
+  if (error) return { success: false, message: "Failed to edit testimonial." };
   revalidatePath("/");
-  return getPraises();
+  return { success: true };
+}
+
+// --- ADMIN DELETE PRAISE ---
+export async function deletePraise(id: number, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase.from('praises').delete().eq('id', id);
+  if (error) {
+    console.error("Supabase error (deletePraise):", error);
+    return { success: false, message: "Database error." };
+  }
+  revalidatePath("/");
+  return { success: true };
 }
 
 
@@ -3480,6 +3519,7 @@ export type User = {
   phone: string;
   joinedAt: string;
   profilePic?: string;
+  isAdmin: boolean; // <--- Admin Flag
 };
 
 type AuthResponse = {
@@ -3505,37 +3545,43 @@ export async function getUsers(): Promise<User[]> {
     role: u.role,
     phone: u.phone,
     profilePic: u.profile_pic,
-    joinedAt: u.joined_at
+    joinedAt: u.joined_at,
+    isAdmin: u.is_admin || false
   }));
 }
 
 export async function registerUser(formData: any): Promise<AuthResponse> {
-  if (formData.doorCode !== "0129") {
+  const CORRECT_CODE = process.env.DOOR_CODE || "0129";
+
+  if (formData.doorCode !== CORRECT_CODE) {
     return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
   }
 
+  const cleanPhone = normalizePhone(formData.phone);
+
   const newUser = {
-    id: Date.now(), // Or let DB handle it
+    id: Date.now(),
     first_name: formData.firstName,
     last_name: formData.lastName,
     alias: formData.alias || "",
     dob: formData.dob, 
     role: formData.role,
-    phone: formData.phone,
+    phone: cleanPhone,
     profile_pic: formData.profilePic || "",
-    joined_at: new Date().toISOString()
+    joined_at: new Date().toISOString(),
+    is_admin: false
   };
 
   const { error } = await supabase.from('users').insert(newUser);
 
   if (error) {
     console.error("Register Error:", error);
-    return { success: false, message: "Registration failed. Phone might be taken." };
+    if (error.code === '23505') return { success: false, message: "Phone number already registered." };
+    return { success: false, message: "Registration failed." };
   }
   
   revalidatePath("/mates");
   
-  // Return the user object formatted for frontend
   return { 
     success: true, 
     user: {
@@ -3547,27 +3593,31 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
       role: newUser.role,
       phone: newUser.phone,
       profilePic: newUser.profile_pic,
-      joinedAt: newUser.joined_at
+      joinedAt: newUser.joined_at,
+      isAdmin: false
     } 
   };
 }
 
 export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
-  if (doorCode !== "0129") {
+  const CORRECT_CODE = process.env.DOOR_CODE || "0129";
+
+  if (doorCode !== CORRECT_CODE) {
     return { success: false, message: "❌ Incorrect Door Code." };
   }
+
+  const cleanPhone = normalizePhone(phone);
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('phone', phone)
+    .eq('phone', cleanPhone) 
     .single();
 
   if (error || !data) {
     return { success: false, message: "User not found. Check phone number or join first." };
   }
 
-  // Map back to frontend User type
   const user: User = {
     id: Number(data.id),
     firstName: data.first_name,
@@ -3577,7 +3627,8 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
     role: data.role,
     phone: data.phone,
     profilePic: data.profile_pic,
-    joinedAt: data.joined_at
+    joinedAt: data.joined_at,
+    isAdmin: data.is_admin || false
   };
 
   return { success: true, user };
@@ -3593,6 +3644,7 @@ export type Reply = {
   author: string;
   content: string;
   timestamp: string;
+  editCount: number;
 };
 
 export type Post = {
@@ -3607,35 +3659,33 @@ export type Post = {
 };
 
 export async function getPosts(): Promise<Post[]> {
-  // Fetch Posts AND their Replies using relation
   const { data, error } = await supabase
     .from('posts')
     .select(`
       *,
       replies (*)
     `)
-    .order('timestamp', { ascending: false }); // Newest posts first
+    .order('timestamp', { ascending: false });
 
   if (error) {
     console.error("Supabase error (getPosts):", error);
     return [];
   }
 
-  // Transform data
   return data.map((p: any) => ({
     id: Number(p.id),
     author: p.author,
     content: p.content,
     timestamp: p.timestamp,
-    image: p.image_url, // Map from DB column
-    video: p.video_url, // Map from DB column
-    editCount: 0, // Simplified for now
-    // Sort replies oldest to newest
+    image: p.image_url,
+    video: p.video_url,
+    editCount: p.edit_count || 0,
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
       content: r.content,
-      timestamp: r.timestamp
+      timestamp: r.timestamp,
+      editCount: r.edit_count || 0
     })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }));
 }
@@ -3646,8 +3696,9 @@ export async function addPost(newPost: Post) {
     author: newPost.author,
     content: newPost.content,
     timestamp: newPost.timestamp,
-    image_url: newPost.image || null, // Map to DB column
-    video_url: newPost.video || null  // Map to DB column
+    image_url: newPost.image || null,
+    video_url: newPost.video || null,
+    edit_count: 0
   });
 
   if (error) console.error("Supabase error (addPost):", error);
@@ -3661,25 +3712,83 @@ export async function addReply(postId: number, content: string, author: string) 
     post_id: postId,
     author: author,
     content: content,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    edit_count: 0
   };
 
   const { error } = await supabase.from('replies').insert(newReply);
-
-  if (error) {
-    console.error("Supabase error (addReply):", error);
-    return { success: false, message: "Failed to reply" };
-  }
+  if (error) return { success: false, message: "Failed to reply" };
 
   revalidatePath("/common-room");
   return { success: true };
 }
 
-export async function editPost(postId: number, newContent: string) {
-  // We can add validation logic here if needed (time checks etc)
+// --- EDIT REPLY (Requires User Phone for verification) ---
+export async function editReply(replyId: number, newContent: string, requestorPhone: string) {
+  // 1. Verify User
+  const { data: user } = await supabase.from('users').eq('phone', requestorPhone).single();
+  if (!user) return { success: false, message: "User verification failed" };
+
+  // 2. Get Reply
+  const { data: reply } = await supabase.from('replies').select('*').eq('id', replyId).single();
+  if (!reply) return { success: false, message: "Reply not found" };
+
+  // 3. Admin Check
+  const isAdmin = user.is_admin === true;
+  
+  if (!isAdmin) {
+    // Permission check for normal user
+    if (reply.author !== user.alias && reply.author !== user.first_name) {
+       return { success: false, message: "Unauthorized" }; 
+    }
+    if ((reply.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
+    const replyTime = new Date(reply.timestamp).getTime();
+    if ((Date.now() - replyTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." };
+  }
+
+  // 4. Update
+  const { error } = await supabase
+    .from('replies')
+    .update({ 
+      content: newContent,
+      edit_count: (reply.edit_count || 0) + 1
+    })
+    .eq('id', replyId);
+
+  if (error) return { success: false, message: "Failed to edit reply" };
+  revalidatePath("/common-room");
+  return { success: true };
+}
+
+// --- EDIT POST (Requires User Phone for verification) ---
+export async function editPost(postId: number, newContent: string, requestorPhone: string) {
+  // 1. Verify User
+  const { data: user } = await supabase.from('users').eq('phone', requestorPhone).single();
+  if (!user) return { success: false, message: "User verification failed" };
+
+  // 2. Get Post
+  const { data: post } = await supabase.from('posts').select('*').eq('id', postId).single();
+  if (!post) return { success: false, message: "Post not found" };
+
+  // 3. Admin Check
+  const isAdmin = user.is_admin === true;
+
+  if (!isAdmin) {
+    if (post.author !== user.alias && post.author !== user.first_name) {
+      return { success: false, message: "Unauthorized" };
+    }
+    if ((post.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
+    const postTime = new Date(post.timestamp).getTime();
+    if ((Date.now() - postTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." }; 
+  }
+
+  // 4. Update
   const { error } = await supabase
     .from('posts')
-    .update({ content: newContent })
+    .update({ 
+      content: newContent,
+      edit_count: (post.edit_count || 0) + 1
+    })
     .eq('id', postId);
 
   if (error) return { success: false, message: "Failed to edit" };
@@ -3687,14 +3796,60 @@ export async function editPost(postId: number, newContent: string) {
   return { success: true };
 }
 
-export async function deletePost(id: number) {
+// --- DELETE POST (Requires User Phone for verification) ---
+export async function deletePost(id: number, requestorPhone: string) {
+  const { data: user } = await supabase.from('users').eq('phone', requestorPhone).single();
+  const { data: post } = await supabase.from('posts').select('*').eq('id', id).single();
+  
+  if (!post || !user) return { success: false, message: "Not found" };
+
+  const isAdmin = user.is_admin === true;
+  const isAuthor = (post.author === user.alias) || (post.author === user.first_name);
+  
+  if (isAdmin) {
+    // Admin Allowed
+  } else if (isAuthor) {
+    const postTime = new Date(post.timestamp).getTime();
+    if ((Date.now() - postTime) > 10 * 60 * 1000) {
+      return { success: false, message: "⏳ Too late! You can only delete within 10 minutes." };
+    }
+  } else {
+    return { success: false, message: "🚫 Unauthorized." };
+  }
+
   const { error } = await supabase.from('posts').delete().eq('id', id);
-  if (error) console.error("Supabase error (deletePost):", error);
+  if (error) return { success: false, message: "Database error." };
   revalidatePath("/common-room");
-  // We don't return the list here, the UI will likely refresh via revalidatePath or optimistic update
-  return []; 
+  return { success: true };
 }
 
+// --- DELETE REPLY (Requires User Phone for verification) ---
+export async function deleteReply(id: number, requestorPhone: string) {
+  const { data: user } = await supabase.from('users').eq('phone', requestorPhone).single();
+  const { data: reply } = await supabase.from('replies').select('*').eq('id', id).single();
+  
+  if (!reply || !user) return { success: false, message: "Not found" };
+
+  const isAdmin = user.is_admin === true;
+  const isAuthor = (reply.author === user.alias) || (reply.author === user.first_name);
+
+  if (isAdmin) {
+     // Allowed
+  } else if (isAuthor) {
+    const replyTime = new Date(reply.timestamp).getTime();
+    if ((Date.now() - replyTime) > 10 * 60 * 1000) {
+      return { success: false, message: "⏳ Too late! You can only delete within 10 minutes." };
+    }
+  } else {
+    return { success: false, message: "🚫 Unauthorized." };
+  }
+
+  const { error } = await supabase.from('replies').delete().eq('id', id);
+  if (error) return { success: false, message: "Database error." };
+
+  revalidatePath("/common-room");
+  return { success: true };
+}
 
 // ============================================================================
 // 5. CHAT SYSTEM
@@ -3711,7 +3866,7 @@ export async function getChats(): Promise<ChatMessage[]> {
   const { data, error } = await supabase
     .from('chats')
     .select('*')
-    .order('timestamp', { ascending: true }) // Oldest first
+    .order('timestamp', { ascending: true }) 
     .limit(100);
 
   if (error) return [];
@@ -3733,8 +3888,6 @@ export async function addChat(text: string, author: string) {
   };
 
   await supabase.from('chats').insert(newChat);
-  
-  // Return the full list to update local state if using polling
   return getChats();
 }
 </file>
