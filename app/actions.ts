@@ -568,3 +568,31 @@ export async function addChat(text: string, author: string) {
   await supabase.from('chats').insert(newChat);
   return getChats();
 }
+
+export async function editChat(id: number, newText: string, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase
+    .from('chats')
+    .update({ text: newText })
+    .eq('id', id);
+
+  if (error) return { success: false, message: "Failed to edit message." };
+  revalidatePath("/chat");
+  return { success: true };
+}
+
+export async function deleteChat(id: number, requestorPhone: string) {
+  const isAdmin = await verifyAdmin(requestorPhone);
+  if (!isAdmin) return { success: false, message: "🚫 Unauthorized: Admins only." };
+
+  const { error } = await supabase
+    .from('chats')
+    .delete()
+    .eq('id', id);
+
+  if (error) return { success: false, message: "Failed to delete message." };
+  revalidatePath("/chat");
+  return { success: true };
+}

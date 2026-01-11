@@ -7,9 +7,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
+import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon, Pencil, Check, Trash2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { addChat, getChats, ChatMessage, getUsers } from "../actions"; 
+import { addChat, getChats, editChat, deleteChat, ChatMessage, getUsers } from "../actions"; 
 import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
 
 // Check if the environment is server-side
@@ -27,6 +27,7 @@ export default function Navigation() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const isChatPage = pathname === "/chat"; 
   const prevPathRef = useRef(pathname);
@@ -37,6 +38,8 @@ export default function Navigation() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "PicUrl"
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editMessageText, setEditMessageText] = useState("");
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -48,7 +51,10 @@ export default function Navigation() {
       const storedUser = sessionStorage.getItem('212user');
       if (storedUser) {
         setIsLoggedIn(true);
-        setCurrentUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setCurrentUser(parsedUser);
+        // Admin Check
+        if (parsedUser.isAdmin || parsedUser.alias === 'idongcodes') setIsAdmin(true);
       } else {
         setIsLoggedIn(false);
       }
@@ -149,6 +155,42 @@ export default function Navigation() {
     window.dispatchEvent(new CustomEvent('user-logout'));
   };
 
+  // Chat Edit/Delete Handlers
+  const startEditingMessage = (msg: ChatMessage) => {
+    setEditingMessageId(msg.id);
+    setEditMessageText(msg.text);
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessageId(null);
+    setEditMessageText("");
+  };
+
+  const saveEditedMessage = async () => {
+    if (!editMessageText.trim() || !editingMessageId || !currentUser) return;
+    
+    const result = await editChat(editingMessageId, editMessageText, currentUser.phone);
+    if (result.success) {
+      setMessages(prev => prev.map(msg => 
+        msg.id === editingMessageId 
+          ? { ...msg, text: editMessageText }
+          : msg
+      ));
+      cancelEditingMessage();
+    }
+  };
+
+  const deleteMessage = async (id: number) => {
+    if (!currentUser) return;
+    
+    if (confirm("Admin: Delete this message?")) {
+      const result = await deleteChat(id, currentUser.phone);
+      if (result.success) {
+        setMessages(prev => prev.filter(msg => msg.id !== id));
+      }
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
     const textToSend = messageText.trim();
@@ -242,6 +284,7 @@ export default function Navigation() {
                   messages.map((msg) => {
                     const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
                     const avatarSrc = userMap[msg.author];
+                    const isEditing = editingMessageId === msg.id;
 
                     return (
                       <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
@@ -264,9 +307,108 @@ export default function Navigation() {
                         </div>
 
                         {/* MESSAGE */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
                           {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px' }}>{msg.author}</div>}
-                          <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
+                          
+                          {/* ADMIN CONTROLS */}
+                          {isAdmin && !isEditing && (
+                            <div style={{ position: 'absolute', top: '-8px', right: isMe ? 'auto' : '-8px', left: isMe ? '-8px' : 'auto', display: 'flex', gap: '4px', zIndex: 10 }}>
+                              <button 
+                                onClick={() => startEditingMessage(msg)} 
+                                style={{ 
+                                  background: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '50%', 
+                                  padding: '4px', 
+                                  cursor: 'pointer', 
+                                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }} 
+                                title="Edit"
+                              >
+                                <Pencil size={12} color="#94a3b8" />
+                              </button>
+                              <button 
+                                onClick={() => deleteMessage(msg.id)} 
+                                style={{ 
+                                  background: 'white', 
+                                  border: 'none', 
+                                  borderRadius: '50%', 
+                                  padding: '4px', 
+                                  cursor: 'pointer', 
+                                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }} 
+                                title="Delete"
+                              >
+                                <Trash2 size={12} color="#ef4444" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* MESSAGE CONTENT */}
+                          {isEditing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                              <textarea
+                                value={editMessageText}
+                                onChange={(e) => setEditMessageText(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  borderRadius: '16px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '0.9rem',
+                                  fontFamily: 'inherit',
+                                  resize: 'vertical',
+                                  minHeight: '40px',
+                                  outline: 'none'
+                                }}
+                                autoFocus
+                              />
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button 
+                                  onClick={cancelEditingMessage}
+                                  style={{
+                                    background: '#94a3b8',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <X size={14} /> Cancel
+                                </button>
+                                <button 
+                                  onClick={saveEditedMessage}
+                                  style={{
+                                    background: 'var(--sandy-brown)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Check size={14} /> Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '8px 12px', borderRadius: '16px', borderTopRightRadius: isMe ? '4px' : '16px', borderTopLeftRadius: isMe ? '16px' : '4px', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', wordWrap: 'break-word' }}>{msg.text}</div>
+                          )}
                         </div>
                       </div>
                     );
