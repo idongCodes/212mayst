@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Smile, Image as ImageIcon, MessageCircle, ArrowLeft, Pencil, Check, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { addChat, getChats, getUsers, editChat, deleteChat, ChatMessage } from '../actions';
+import ClickableUser from '../components/ClickableUser';
 
 // ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
@@ -18,6 +19,7 @@ export default function ChatPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
@@ -43,9 +45,11 @@ export default function ChatPage() {
         if (user.isAdmin || user.alias === 'idongcodes') setIsAdmin(true);
         
         // Fetch user avatars
-        const users = await getUsers();
+        const fetchedUsers = await getUsers();
+        setUsers(fetchedUsers);
+        
         const map: Record<string, string> = {};
-        users.forEach(u => {
+        fetchedUsers.forEach(u => {
           if (u.profilePic) {
             map[u.firstName] = u.profilePic;
             if (u.alias) map[u.alias] = u.profilePic;
@@ -220,23 +224,32 @@ export default function ChatPage() {
             const avatarSrc = userMap[msg.author];
             const isEditing = editingMessageId === msg.id;
             
+            // Find user data for this message author
+            const messageUser = users.find(u => 
+              u.firstName === msg.author || u.alias === msg.author
+            );
+            
             return (
               <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '70%', display: 'flex', gap: '10px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                <div style={{ 
-                  width: '36px', 
-                  height: '36px', 
-                  borderRadius: '50%', 
-                  backgroundColor: isMe ? '#e0f2fe' : '#ffffff', 
-                  color: isMe ? '#0284c7' : '#64748b', 
-                  border: '1px solid #e2e8f0', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  fontSize: '0.9rem', 
-                  fontWeight: 'bold', 
-                  flexShrink: 0,
-                  overflow: 'hidden'
-                }}>
+                <ClickableUser 
+                  user={messageUser || { firstName: msg.author, lastName: '' }} 
+                  currentUser={currentUser}
+                  style={{ 
+                    width: '36px', 
+                    height: '36px', 
+                    borderRadius: '50%', 
+                    backgroundColor: isMe ? '#e0f2fe' : '#ffffff', 
+                    color: isMe ? '#0284c7' : '#64748b', 
+                    border: '1px solid #e2e8f0', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '0.9rem', 
+                    fontWeight: 'bold', 
+                    flexShrink: 0,
+                    overflow: 'hidden'
+                  }}
+                >
                   {avatarSrc ? (
                     <img 
                       src={avatarSrc} 
@@ -246,9 +259,17 @@ export default function ChatPage() {
                   ) : (
                     getInitial(msg.author)
                   )}
-                </div>
+                </ClickableUser>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
-                  {!isMe && <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px' }}>{msg.author}</span>}
+                  {!isMe && (
+                    <ClickableUser 
+                      user={messageUser || { firstName: msg.author, lastName: '' }} 
+                      currentUser={currentUser}
+                      style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px', cursor: 'pointer' }}
+                    >
+                      {msg.author}
+                    </ClickableUser>
+                  )}
                   
                   {/* ADMIN CONTROLS */}
                   {isAdmin && !isEditing && (

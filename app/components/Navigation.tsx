@@ -11,6 +11,7 @@ import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, M
 import { useEffect, useState, useRef } from "react";
 import { addChat, getChats, editChat, deleteChat, ChatMessage, getUsers } from "../actions"; 
 import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
+import ClickableUser from "./ClickableUser";
 
 // Check if the environment is server-side
 const isServerSide = typeof window === "undefined";
@@ -28,6 +29,7 @@ export default function Navigation() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
   
   const isChatPage = pathname === "/chat"; 
   const prevPathRef = useRef(pathname);
@@ -65,16 +67,20 @@ export default function Navigation() {
   // 2. Fetch User Avatars (Once on load)
   useEffect(() => {
     if (isLoggedIn) {
-      getUsers().then(users => {
+      const fetchUsers = async () => {
+        const fetchedUsers = await getUsers();
+        setUsers(fetchedUsers);
+        
         const map: Record<string, string> = {};
-        users.forEach(u => {
+        fetchedUsers.forEach(u => {
           if (u.profilePic) {
             map[u.firstName] = u.profilePic;
             if (u.alias) map[u.alias] = u.profilePic;
           }
         });
         setUserMap(map);
-      });
+      };
+      fetchUsers();
     }
   }, [isLoggedIn]);
 
