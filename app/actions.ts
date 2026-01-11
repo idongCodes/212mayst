@@ -1,6 +1,6 @@
 /**
  * file: app/actions.ts
- * description: Complete Server Actions with secure Database-driven Admin verification.
+ * description: Fixed Type Error by adding .select('*') to all user queries.
  */
 
 "use server";
@@ -387,12 +387,19 @@ export async function addReply(postId: number, content: string, author: string) 
 
 // --- EDIT REPLY ---
 export async function editReply(replyId: number, newContent: string, requestorPhone: string) {
-  const isAdmin = await verifyAdmin(requestorPhone);
-  
+  // FIX: Added .select('*')
+  const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
+  if (!user) return { success: false, message: "User verification failed" };
+
   const { data: reply } = await supabase.from('replies').select('*').eq('id', replyId).single();
   if (!reply) return { success: false, message: "Reply not found" };
 
+  const isAdmin = user.is_admin === true;
+  
   if (!isAdmin) {
+    if (reply.author !== user.alias && reply.author !== user.first_name) {
+       return { success: false, message: "Unauthorized" }; 
+    }
     if ((reply.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
     const replyTime = new Date(reply.timestamp).getTime();
     if ((Date.now() - replyTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." };
@@ -413,12 +420,19 @@ export async function editReply(replyId: number, newContent: string, requestorPh
 
 // --- EDIT POST ---
 export async function editPost(postId: number, newContent: string, requestorPhone: string) {
-  const isAdmin = await verifyAdmin(requestorPhone);
+  // FIX: Added .select('*')
+  const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
+  if (!user) return { success: false, message: "User verification failed" };
 
   const { data: post } = await supabase.from('posts').select('*').eq('id', postId).single();
   if (!post) return { success: false, message: "Post not found" };
 
+  const isAdmin = user.is_admin === true;
+
   if (!isAdmin) {
+    if (post.author !== user.alias && post.author !== user.first_name) {
+      return { success: false, message: "Unauthorized" };
+    }
     if ((post.edit_count || 0) >= 1) return { success: false, message: "Limit reached: You can only edit once." };
     const postTime = new Date(post.timestamp).getTime();
     if ((Date.now() - postTime) > 15 * 60 * 1000) return { success: false, message: "Time's up: Only editable for 15 mins." }; 
@@ -439,7 +453,9 @@ export async function editPost(postId: number, newContent: string, requestorPhon
 
 // --- DELETE POST ---
 export async function deletePost(id: number, requestorPhone: string) {
-  const { data: user } = await supabase.from('users').eq('phone', normalizePhone(requestorPhone)).single();
+  // FIX: Added .select('*')
+  const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
+  
   const { data: post } = await supabase.from('posts').select('*').eq('id', id).single();
   
   if (!post || !user) return { success: false, message: "Not found" };
@@ -466,7 +482,9 @@ export async function deletePost(id: number, requestorPhone: string) {
 
 // --- DELETE REPLY ---
 export async function deleteReply(id: number, requestorPhone: string) {
-  const { data: user } = await supabase.from('users').eq('phone', normalizePhone(requestorPhone)).single();
+  // FIX: Added .select('*')
+  const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
+  
   const { data: reply } = await supabase.from('replies').select('*').eq('id', id).single();
   
   if (!reply || !user) return { success: false, message: "Not found" };
