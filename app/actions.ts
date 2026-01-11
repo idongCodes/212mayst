@@ -1,12 +1,27 @@
 /**
  * file: app/actions.ts
- * description: Replaced local JSON storage with Supabase Database operations.
+ * description: Added phone number normalization to Register and Login actions.
  */
 
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "./lib/supabaseClient";
+
+// ============================================================================
+// HELPER: PHONE NORMALIZATION
+// ============================================================================
+function normalizePhone(input: string): string {
+  // 1. Remove all non-numeric characters
+  const cleaned = input.replace(/\D/g, '');
+
+  // 2. Handle US/Canada country codes (11 digits starting with 1)
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return cleaned.substring(1);
+  }
+
+  return cleaned;
+}
 
 // ============================================================================
 // 1. PRAISE SYSTEM
@@ -32,7 +47,6 @@ export async function getPraises(): Promise<Praise[]> {
     return [];
   }
 
-  // Map DB snake_case to Frontend camelCase
   return data.map((p: any) => ({
     id: Number(p.id),
     name: p.name,
@@ -45,7 +59,6 @@ export async function getPraises(): Promise<Praise[]> {
 
 export async function addPraise(newPraise: Praise) {
   const { error } = await supabase.from('praises').insert({
-    // Let DB handle ID and Timestamp automatically if possible, or pass them
     id: newPraise.id, 
     name: newPraise.name,
     role: newPraise.role,
@@ -178,18 +191,23 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function registerUser(formData: any): Promise<AuthResponse> {
-  if (formData.doorCode !== "0129") {
+  const CORRECT_CODE = process.env.DOOR_CODE || "0129";
+
+  if (formData.doorCode !== CORRECT_CODE) {
     return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
   }
 
+  // NORMALIZE PHONE
+  const cleanPhone = normalizePhone(formData.phone);
+
   const newUser = {
-    id: Date.now(), // Or let DB handle it
+    id: Date.now(),
     first_name: formData.firstName,
     last_name: formData.lastName,
     alias: formData.alias || "",
     dob: formData.dob, 
     role: formData.role,
-    phone: formData.phone,
+    phone: cleanPhone, // Save normalized phone
     profile_pic: formData.profilePic || "",
     joined_at: new Date().toISOString()
   };
@@ -198,12 +216,15 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
 
   if (error) {
     console.error("Register Error:", error);
-    return { success: false, message: "Registration failed. Phone might be taken." };
+    // Handle Unique Constraint Violation (P2002 equivalent in Supabase)
+    if (error.code === '23505') {
+       return { success: false, message: "This phone number is already registered." };
+    }
+    return { success: false, message: "Registration failed." };
   }
   
   revalidatePath("/mates");
   
-  // Return the user object formatted for frontend
   return { 
     success: true, 
     user: {
@@ -221,21 +242,25 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
 }
 
 export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
-  if (doorCode !== "0129") {
+  const CORRECT_CODE = process.env.DOOR_CODE || "0129";
+
+  if (doorCode !== CORRECT_CODE) {
     return { success: false, message: "❌ Incorrect Door Code." };
   }
+
+  // NORMALIZE PHONE
+  const cleanPhone = normalizePhone(phone);
 
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('phone', phone)
+    .eq('phone', cleanPhone) // Check against normalized DB value
     .single();
 
   if (error || !data) {
     return { success: false, message: "User not found. Check phone number or join first." };
   }
 
-  // Map back to frontend User type
   const user: User = {
     id: Number(data.id),
     firstName: data.first_name,
@@ -275,30 +300,27 @@ export type Post = {
 };
 
 export async function getPosts(): Promise<Post[]> {
-  // Fetch Posts AND their Replies using relation
   const { data, error } = await supabase
     .from('posts')
     .select(`
       *,
       replies (*)
     `)
-    .order('timestamp', { ascending: false }); // Newest posts first
+    .order('timestamp', { ascending: false });
 
   if (error) {
     console.error("Supabase error (getPosts):", error);
     return [];
   }
 
-  // Transform data
   return data.map((p: any) => ({
     id: Number(p.id),
     author: p.author,
     content: p.content,
     timestamp: p.timestamp,
-    image: p.image_url, // Map from DB column
-    video: p.video_url, // Map from DB column
-    editCount: 0, // Simplified for now
-    // Sort replies oldest to newest
+    image: p.image_url,
+    video: p.video_url,
+    editCount: 0,
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
@@ -314,8 +336,8 @@ export async function addPost(newPost: Post) {
     author: newPost.author,
     content: newPost.content,
     timestamp: newPost.timestamp,
-    image_url: newPost.image || null, // Map to DB column
-    video_url: newPost.video || null  // Map to DB column
+    image_url: newPost.image || null,
+    video_url: newPost.video || null
   });
 
   if (error) console.error("Supabase error (addPost):", error);
@@ -344,7 +366,6 @@ export async function addReply(postId: number, content: string, author: string) 
 }
 
 export async function editPost(postId: number, newContent: string) {
-  // We can add validation logic here if needed (time checks etc)
   const { error } = await supabase
     .from('posts')
     .update({ content: newContent })
@@ -359,7 +380,6 @@ export async function deletePost(id: number) {
   const { error } = await supabase.from('posts').delete().eq('id', id);
   if (error) console.error("Supabase error (deletePost):", error);
   revalidatePath("/common-room");
-  // We don't return the list here, the UI will likely refresh via revalidatePath or optimistic update
   return []; 
 }
 
@@ -379,7 +399,7 @@ export async function getChats(): Promise<ChatMessage[]> {
   const { data, error } = await supabase
     .from('chats')
     .select('*')
-    .order('timestamp', { ascending: true }) // Oldest first
+    .order('timestamp', { ascending: true }) 
     .limit(100);
 
   if (error) return [];
@@ -401,7 +421,5 @@ export async function addChat(text: string, author: string) {
   };
 
   await supabase.from('chats').insert(newChat);
-  
-  // Return the full list to update local state if using polling
   return getChats();
 }
