@@ -1,6 +1,6 @@
 /**
  * file: app/components/Navigation.tsx
- * description: Chat Popup now displays real profile pictures from registered users.
+ * description: Replaced Chat polling with Supabase Realtime subscription.
  */
 
 "use client";
@@ -9,9 +9,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, Minus, Maximize2, X, Send, Smile, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { addChat, getChats, ChatMessage, getUsers, User } from "../actions"; // Import getUsers
+import { addChat, getChats, ChatMessage, getUsers } from "../actions"; 
+import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
 
-// ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
 const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
 
@@ -30,7 +30,7 @@ export default function Navigation() {
   const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
-  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "Base64Pic"
+  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "PicUrl"
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -50,13 +50,12 @@ export default function Navigation() {
     checkLogin();
   }, [pathname]);
 
-  // 2. Fetch User Avatars
+  // 2. Fetch User Avatars (Once on load)
   useEffect(() => {
     if (isLoggedIn) {
       getUsers().then(users => {
         const map: Record<string, string> = {};
         users.forEach(u => {
-          // Map both real name and alias to the profile pic
           if (u.profilePic) {
             map[u.firstName] = u.profilePic;
             if (u.alias) map[u.alias] = u.profilePic;
@@ -75,22 +74,51 @@ export default function Navigation() {
     prevPathRef.current = pathname;
   }, [pathname]);
 
-  // 4. Polling
+  // 4. SUPABASE REALTIME SUBSCRIPTION (Replaces Polling)
   useEffect(() => {
-    if (!isChatOpen) return;
-    const fetchMessages = async () => { 
-      const serverMessages = await getChats(); 
-      setMessages(current => {
-        if (JSON.stringify(current) !== JSON.stringify(serverMessages)) {
-          return serverMessages;
-        }
-        return current;
-      });
+    if (!isLoggedIn) return;
+
+    // A. Initial Load
+    const loadInitialMessages = async () => {
+      const initialChats = await getChats();
+      setMessages(initialChats);
     };
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
-  }, [isChatOpen]);
+    loadInitialMessages();
+
+    // B. Subscribe to "chats" table changes
+    const channel = supabase
+      .channel('realtime-chats')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chats' },
+        (payload) => {
+          // Payload contains the new row data
+          const newMsg = payload.new as any;
+          
+          setMessages((prev) => {
+            // Avoid duplicates if we optimistically added it already
+            if (prev.some(m => m.id === Number(newMsg.id))) return prev;
+            
+            return [...prev, {
+              id: Number(newMsg.id),
+              author: newMsg.author,
+              text: newMsg.text,
+              timestamp: newMsg.timestamp
+            }];
+          });
+
+          // Scroll on new message if near bottom
+          if (isNearBottom) {
+             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLoggedIn, isNearBottom]);
 
   // 5. Scroll Logic
   const handleScroll = () => {
@@ -114,7 +142,10 @@ export default function Navigation() {
     setMessageText(""); setShowEmojiPicker(false); setShowGifPicker(false);
     
     const authorName = currentUser.alias || currentUser.firstName;
-    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
+
+    // Optimistic Update (Show immediately)
+    const tempId = Date.now();
+    setMessages(prev => [...prev, { id: tempId, author: authorName, text: textToSend, timestamp: new Date().toISOString() }]);
     
     setIsNearBottom(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
@@ -129,10 +160,14 @@ export default function Navigation() {
     if (!currentUser) return; 
     const authorName = currentUser.alias || currentUser.firstName; 
     const gifText = `[GIF: ${label}]`; 
-    setMessages(prev => [...prev, { id: Date.now(), author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    
+    const tempId = Date.now();
+    setMessages(prev => [...prev, { id: tempId, author: authorName, text: gifText, timestamp: new Date().toISOString() }]); 
+    
     setShowGifPicker(false); 
     setIsNearBottom(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    
     await addChat(gifText, authorName); 
   };
 
@@ -227,7 +262,7 @@ export default function Navigation() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* INPUT AREA (Same as before) */}
+              {/* INPUT AREA */}
               {showEmojiPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '5px' }}>{COMMON_EMOJIS.map(emoji => <button key={emoji} onClick={() => handleEmojiClick(emoji)} style={{ fontSize: '1.2rem', padding: '5px', border: 'none', background: 'none', cursor: 'pointer' }}>{emoji}</button>)}</div>}
               {showGifPicker && <div style={{ height: '150px', overflowY: 'auto', backgroundColor: '#f1f5f9', borderTop: '1px solid #e2e8f0', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>{MOCK_GIFS.map(gif => <button key={gif.id} onClick={() => handleGifClick(gif.label)} style={{ height: '60px', backgroundColor: gif.color, borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{gif.label} GIF</button>)}</div>}
               <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', backgroundColor: 'white' }}>

@@ -1,6 +1,6 @@
 /**
  * file: app/common-room/page.tsx
- * description: Updated to 200MB limit and 30s video duration.
+ * description: Updated to upload media to Supabase Storage before creating a post.
  */
 
 "use client";
@@ -8,26 +8,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Camera, Image as ImageIcon, Video, Smile, User, Pencil, X, Check, Trash2, MessageSquare, AlertCircle } from 'lucide-react';
 import { addPost, getPosts, editPost, deletePost, addReply, Post } from '../actions';
+import { supabase } from '../lib/supabaseClient'; // <--- Import Supabase Client
 import Link from 'next/link';
 
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋", "💯", "🙌", "💀", "💩", "🦄", "🌈", "🎈", "🎁"];
 const MAX_CHARS = 250;
-const MAX_FILE_SIZE_MB = 200; // <--- Updated to 200MB
-const MAX_VIDEO_DURATION_SEC = 30; // <--- Updated to 30 Seconds
+const MAX_FILE_SIZE_MB = 200;
+const MAX_VIDEO_DURATION_SEC = 30;
 
 export default function CommonRoom() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
   
   // Media State
-  const [selectedMedia, setSelectedMedia] = useState<string>(""); 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Store actual File object
+  const [previewUrl, setPreviewUrl] = useState<string>(""); 
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [mediaError, setMediaError] = useState("");
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Edit & Reply State
+  // ... [Edit & Reply State & Refs remain the same] ...
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
@@ -40,7 +42,6 @@ export default function CommonRoom() {
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false); 
 
-  // Refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -64,58 +65,16 @@ export default function CommonRoom() {
     }
   }, []);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; 
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; 
-    }
-  }, [message]);
-
-  useEffect(() => {
-    if (replyTextareaRef.current) {
-      replyTextareaRef.current.style.height = 'auto'; 
-      replyTextareaRef.current.style.height = `${replyTextareaRef.current.scrollHeight}px`; 
-    }
-  }, [replyText, replyingToId]);
-
+  // ... [useEffect hooks for auto-resize remain the same] ...
+  useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; } }, [message]);
+  useEffect(() => { if (replyTextareaRef.current) { replyTextareaRef.current.style.height = 'auto'; replyTextareaRef.current.style.height = `${replyTextareaRef.current.scrollHeight}px`; } }, [replyText, replyingToId]);
   useEffect(() => { if (editingId && editInputRef.current) editInputRef.current.focus(); }, [editingId]);
-
-  // --- HANDLERS ---
 
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
   const handleVideoClick = () => videoInputRef.current?.click();
 
-  // Helper: Compress Image
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const maxWidth = 800; // Resize to max 800px width
-          const scaleSize = maxWidth / img.width;
-          canvas.width = maxWidth;
-          canvas.height = img.height * scaleSize;
-          
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            // Compress quality to 0.7
-            resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-          } else {
-            reject("Canvas Error");
-          }
-        };
-      };
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  // Handle Media Selection (Image or Video)
+  // Handle Media Selection
   const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -126,51 +85,65 @@ export default function CommonRoom() {
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > MAX_FILE_SIZE_MB) {
       setMediaError(`File too large (${fileSizeMB.toFixed(1)}MB). Max limit is ${MAX_FILE_SIZE_MB}MB.`);
-      e.target.value = ""; // Reset
+      e.target.value = ""; 
       return;
     }
 
+    // 2. Video Duration Check
     if (type === 'video') {
-      // 2. Video Duration Check
       const videoElement = document.createElement('video');
       videoElement.preload = 'metadata';
       videoElement.src = URL.createObjectURL(file);
       
       videoElement.onloadedmetadata = () => {
         URL.revokeObjectURL(videoElement.src);
-        if (videoElement.duration > MAX_VIDEO_DURATION_SEC + 0.5) { // Allow slight buffer
+        if (videoElement.duration > MAX_VIDEO_DURATION_SEC + 1) { 
           setMediaError(`Video too long (${Math.round(videoElement.duration)}s). Max ${MAX_VIDEO_DURATION_SEC} seconds.`);
           e.target.value = "";
           return;
         } else {
-          // Process Video
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setSelectedMedia(reader.result as string);
-            setMediaType('video');
-          };
-          reader.readAsDataURL(file);
+          // Success
+          setSelectedFile(file);
+          setPreviewUrl(URL.createObjectURL(file));
+          setMediaType('video');
         }
       };
     } else {
-      // 3. Image Compression
-      try {
-        const compressedBase64 = await compressImage(file);
-        setSelectedMedia(compressedBase64);
-        setMediaType('image');
-      } catch (err) {
-        setMediaError("Failed to process image.");
-      }
+      // Image
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      setMediaType('image');
     }
   };
 
-  const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
-  const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
-
   const handlePostSubmit = async () => {
-    if (!message.trim() && !selectedMedia) return;
+    if (!message.trim() && !selectedFile) return;
     setLoading(true);
+
+    let mediaUrl = "";
+
+    // 1. Upload to Supabase Storage if file exists
+    if (selectedFile) {
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `posts/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads') // Make sure this bucket exists in Supabase!
+        .upload(filePath, selectedFile);
+
+      if (uploadError) {
+        alert("Upload failed: " + uploadError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Get Public URL
+      const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      mediaUrl = data.publicUrl;
+    }
     
+    // 2. Save Post to DB with URL
     const newPost: Post = { 
       id: Date.now(), 
       author: authorName, 
@@ -178,14 +151,17 @@ export default function CommonRoom() {
       timestamp: new Date().toISOString(), 
       editCount: 0, 
       replies: [],
-      // Assign to correct field
-      image: mediaType === 'image' ? selectedMedia : undefined,
-      video: mediaType === 'video' ? selectedMedia : undefined
+      image: mediaType === 'image' ? mediaUrl : undefined,
+      video: mediaType === 'video' ? mediaUrl : undefined
     };
 
+    // Optimistic Update
     setPosts([newPost, ...posts]);
+    
+    // Reset UI
     setMessage("");
-    setSelectedMedia(""); 
+    setSelectedFile(null);
+    setPreviewUrl("");
     setMediaType(null);
     setMediaError("");
     setShowEmojiPicker(false);
@@ -195,6 +171,9 @@ export default function CommonRoom() {
     setLoading(false);
   };
 
+  // ... [Rest of the handlers remain UNCHANGED] ...
+  const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
+  const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
   const handleReplySubmit = async (postId: number) => {
     if (!replyText.trim()) return;
     setReplyLoading(true);
@@ -207,41 +186,14 @@ export default function CommonRoom() {
     await addReply(postId, newReply.content, authorName);
     setReplyLoading(false);
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostSubmit(); } };
   const handleReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, postId: number) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReplySubmit(postId); } };
-
-  const isEditable = (post: Post) => {
-    if ((post.editCount || 0) >= 1) return false;
-    return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000;
-  };
-
+  const isEditable = (post: Post) => { if ((post.editCount || 0) >= 1) return false; return (Date.now() - new Date(post.timestamp).getTime()) < 15 * 60 * 1000; };
   const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); setReplyingToId(null); };
   const cancelEditing = () => { setEditingId(null); setEditText(""); };
-  
-  const saveEdit = async () => {
-    if (!editingId || !editText.trim()) return;
-    setSaveLoading(true);
-    const result = await editPost(editingId, editText.trim());
-    if (result.success) {
-      setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p));
-      setEditingId(null); setEditText("");
-    } else {
-      alert(result.message); setEditingId(null);
-    }
-    setSaveLoading(false);
-  };
-
-  const handleDeletePost = async (id: number) => {
-    if (!confirm("Admin: Delete this post?")) return;
-    setPosts(posts.filter(p => p.id !== id));
-    await deletePost(id);
-  };
-
-  const formatDate = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  };
+  const saveEdit = async () => { if (!editingId || !editText.trim()) return; setSaveLoading(true); const result = await editPost(editingId, editText.trim()); if (result.success) { setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p)); setEditingId(null); setEditText(""); } else { alert(result.message); setEditingId(null); } setSaveLoading(false); };
+  const handleDeletePost = async (id: number) => { if (!confirm("Admin: Delete this post?")) return; setPosts(posts.filter(p => p.id !== id)); await deletePost(id); };
+  const formatDate = (isoString: string) => { const date = new Date(isoString); return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); };
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
@@ -264,25 +216,20 @@ export default function CommonRoom() {
               <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
               
               {/* MEDIA PREVIEW */}
-              {selectedMedia && (
+              {previewUrl && (
                 <div className="animate-fade-in" style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}>
                   {mediaType === 'image' ? (
-                    <img src={selectedMedia} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
+                    <img src={previewUrl} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
                   ) : (
-                    <video src={selectedMedia} controls style={{ maxHeight: '200px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
+                    <video src={previewUrl} controls style={{ maxHeight: '200px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
                   )}
-                  <button onClick={() => { setSelectedMedia(""); setMediaType(null); }} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
+                  <button onClick={() => { setSelectedFile(null); setPreviewUrl(""); setMediaType(null); }} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
                     <X size={14} />
                   </button>
                 </div>
               )}
 
-              {/* Error Message */}
-              {mediaError && (
-                <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', color: '#ef4444', fontSize: '0.85rem' }}>
-                  <AlertCircle size={14} /> {mediaError}
-                </div>
-              )}
+              {mediaError && <div className="animate-slide-in" style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', color: '#ef4444', fontSize: '0.85rem' }}><AlertCircle size={14} /> {mediaError}</div>}
 
               <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
               {showEmojiPicker && (
@@ -294,46 +241,36 @@ export default function CommonRoom() {
                 </>
               )}
             </div>
-            <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedMedia)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedMedia) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
+            <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedFile)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedFile) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
           </div>
           
-          {/* Action Bar */}
           <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
             <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Take Photo"><Camera size={24} /></div>
             <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Image"><ImageIcon size={24} /></div>
             <div onClick={handleVideoClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }} title="Upload Video (30s max)"><Video size={24} /></div>
           </div>
           
-          {/* Hidden Inputs */}
           <input type="file" ref={cameraInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" capture="environment" hidden />
           <input type="file" ref={uploadInputRef} onChange={(e) => handleMediaSelect(e, 'image')} accept="image/*" hidden />
           <input type="file" ref={videoInputRef} onChange={(e) => handleMediaSelect(e, 'video')} accept="video/*" hidden />
         </div>
 
-        {/* Feed */}
+        {/* Feed (Rendering Logic Remains the Same) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <User size={20} color="#0284c7" />
-              </div>
+              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><User size={20} color="#0284c7" /></div>
               <div style={{ flex: 1 }}>
                 
+                {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{post.author}</span>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                      {formatDate(post.timestamp)}
-                      {(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}
-                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{formatDate(post.timestamp)}{(post.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic', fontSize: '0.7rem' }}>(Edited)</span>}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    {!editingId && post.author === authorName && isEditable(post) && (
-                      <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>
-                    )}
-                    {isAdmin && (
-                      <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>
-                    )}
+                    {!editingId && post.author === authorName && isEditable(post) && <button onClick={() => startEditing(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '5px' }} title="Edit"><Pencil size={16} /></button>}
+                    {isAdmin && <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }} title="Admin Delete"><Trash2 size={16} /></button>}
                   </div>
                 </div>
 
@@ -348,14 +285,12 @@ export default function CommonRoom() {
                   <>
                     <p style={{ margin: '0 0 10px 0', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
                     
-                    {/* Render Image */}
+                    {/* Render Media */}
                     {post.image && (
                       <div style={{ marginBottom: '10px' }}>
                         <img src={post.image} alt="Post Attachment" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px' }} />
                       </div>
                     )}
-
-                    {/* Render Video */}
                     {post.video && (
                       <div style={{ marginBottom: '10px' }}>
                         <video src={post.video} controls style={{ width: '100%', maxHeight: '400px', borderRadius: '12px', backgroundColor: 'black' }} />
@@ -368,7 +303,7 @@ export default function CommonRoom() {
                   </>
                 )}
 
-                {/* Reply Input */}
+                {/* Reply Input & List (Same as before) */}
                 {replyingToId === post.id && (
                   <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {showReplyEmojiPicker && (
@@ -385,8 +320,6 @@ export default function CommonRoom() {
                     </div>
                   </div>
                 )}
-
-                {/* Render Replies */}
                 {post.replies && post.replies.length > 0 && (
                   <div style={{ marginTop: '1rem', borderLeft: '2px solid #f1f5f9', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {post.replies.map((reply) => (
