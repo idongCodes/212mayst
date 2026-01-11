@@ -211,6 +211,7 @@ export type Post = {
   editCount: number; 
   replies?: Reply[]; // Now 'Reply' is defined above
   image?: string;
+  video?: string;
 };
 
 export async function getPosts(): Promise<Post[]> {
