@@ -1,6 +1,6 @@
 /**
  * file: app/common-room/page.tsx
- * description: Added Reply functionality with Emoji Pickers in the reply inputs.
+ * description: Added image upload, preview, and rendering for posts.
  */
 
 "use client";
@@ -16,6 +16,7 @@ const MAX_CHARS = 250;
 export default function CommonRoom() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string>(""); // <--- New State for Image
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -28,7 +29,7 @@ export default function CommonRoom() {
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
-  const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false); // <--- New State for Reply Emoji
+  const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
   
   const [authorName, setAuthorName] = useState("Guest");
   const [isGuest, setIsGuest] = useState(true);
@@ -56,7 +57,6 @@ export default function CommonRoom() {
     }
   }, []);
 
-  // Auto-resize main textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'; 
@@ -64,7 +64,6 @@ export default function CommonRoom() {
     }
   }, [message]);
 
-  // Auto-resize reply textarea
   useEffect(() => {
     if (replyTextareaRef.current) {
       replyTextareaRef.current.style.height = 'auto'; 
@@ -77,16 +76,37 @@ export default function CommonRoom() {
   const handleCameraClick = () => cameraInputRef.current?.click();
   const handleUploadClick = () => uploadInputRef.current?.click();
   
+  // Handle Image Selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleEmojiClick = (emoji: string) => { if (message.length + emoji.length <= MAX_CHARS) setMessage(prev => prev + emoji); };
   
   const handleReplyEmojiClick = (emoji: string) => { if (replyText.length + emoji.length <= MAX_CHARS) setReplyText(prev => prev + emoji); };
 
   const handlePostSubmit = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() && !selectedImage) return; // Allow empty text if image exists
     setLoading(true);
-    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0, replies: [] };
+    const newPost: Post = { 
+      id: Date.now(), 
+      author: authorName, 
+      content: message.trim(), 
+      timestamp: new Date().toISOString(), 
+      editCount: 0, 
+      replies: [],
+      image: selectedImage // Add Image
+    };
     setPosts([newPost, ...posts]);
     setMessage("");
+    setSelectedImage(""); // Clear image
     setShowEmojiPicker(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     await addPost(newPost);
@@ -97,7 +117,6 @@ export default function CommonRoom() {
     if (!replyText.trim()) return;
     setReplyLoading(true);
     
-    // Optimistic UI update
     const newReply = {
       id: Date.now(),
       author: authorName,
@@ -167,7 +186,7 @@ export default function CommonRoom() {
     <main style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         
-        {/* Header & Input UI */}
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--sandy-brown)', marginBottom: '1rem' }}>
             {isGuest ? "Welcome to the Common Room" : `Welcome, ${authorName}`}
@@ -175,11 +194,23 @@ export default function CommonRoom() {
           {isGuest ? <p style={{ color: 'gray' }}>You are viewing as a guest. <Link href="/join" style={{ textDecoration: 'underline', color: 'var(--sky-blue)', fontWeight: 'bold' }}>Join the house</Link> to post with your name!</p> : <p style={{ color: 'gray' }}>This is where we hang out. Pull up a chair!</p>}
         </div>
 
+        {/* Input Area */}
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <textarea ref={textareaRef} placeholder={`What's on your mind, ${authorName}?`} value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyDown} maxLength={MAX_CHARS} rows={1} style={{ width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '1rem', backgroundColor: '#f8fafc', outline: 'none', resize: 'none', overflow: 'hidden', minHeight: '48px', fontFamily: 'inherit', lineHeight: '1.5' }} />
               <div style={{ textAlign: 'right', fontSize: '0.75rem', color: message.length >= MAX_CHARS ? '#ef4444' : '#94a3b8', marginTop: '4px', paddingRight: '5px' }}>{message.length}/{MAX_CHARS}</div>
+              
+              {/* IMAGE PREVIEW */}
+              {selectedImage && (
+                <div className="animate-fade-in" style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}>
+                  <img src={selectedImage} alt="Preview" style={{ maxHeight: '150px', borderRadius: '12px', border: '2px solid #e2e8f0' }} />
+                  <button onClick={() => setSelectedImage("")} style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', border: '2px solid white', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={20} /></button>
               {showEmojiPicker && (
                 <>
@@ -190,14 +221,15 @@ export default function CommonRoom() {
                 </>
               )}
             </div>
-            <button onClick={handlePostSubmit} disabled={loading} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
+            <button onClick={handlePostSubmit} disabled={loading || (!message.trim() && !selectedImage)} style={{ backgroundColor: 'var(--sandy-brown)', color: 'white', border: 'none', padding: '0 20px', height: '48px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', opacity: loading || (!message.trim() && !selectedImage) ? 0.7 : 1, alignSelf: 'flex-start' }}>{loading ? '...' : 'Post'} <Send size={18} /></button>
           </div>
           <div style={{ display: 'flex', gap: '20px', paddingLeft: '5px' }}>
             <div onClick={handleCameraClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><Camera size={24} /></div>
             <div onClick={handleUploadClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#64748b' }}><ImageIcon size={24} /></div>
           </div>
-          <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" hidden />
-          <input type="file" ref={uploadInputRef} accept="image/*" hidden />
+          {/* File Inputs with Listeners */}
+          <input type="file" ref={cameraInputRef} onChange={handleImageSelect} accept="image/*" capture="environment" hidden />
+          <input type="file" ref={uploadInputRef} onChange={handleImageSelect} accept="image/*" hidden />
         </div>
 
         {/* Feed */}
@@ -228,7 +260,7 @@ export default function CommonRoom() {
                   </div>
                 </div>
 
-                {/* Post Content or Edit Mode */}
+                {/* Post Content */}
                 {editingId === post.id ? (
                   <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input ref={editInputRef} type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} maxLength={MAX_CHARS} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--sky-blue)', outline: 'none' }} />
@@ -239,6 +271,13 @@ export default function CommonRoom() {
                   <>
                     <p style={{ margin: '0 0 10px 0', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{post.content}</p>
                     
+                    {/* Render Post Image */}
+                    {post.image && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <img src={post.image} alt="Post Attachment" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px' }} />
+                      </div>
+                    )}
+
                     {/* Reply Button */}
                     <button 
                       onClick={() => { setReplyingToId(replyingToId === post.id ? null : post.id); setShowReplyEmojiPicker(false); }} 
@@ -249,11 +288,9 @@ export default function CommonRoom() {
                   </>
                 )}
 
-                {/* Reply Input */}
+                {/* Reply Input (Same as previous) */}
                 {replyingToId === post.id && (
                   <div className="animate-fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    
-                    {/* Reply Emoji Picker */}
                     {showReplyEmojiPicker && (
                       <div style={{ marginBottom: '5px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(30px, 1fr))', gap: '5px', width: '100%', maxHeight: '150px', overflowY: 'auto' }}>
                         {COMMON_EMOJIS.map((emoji) => (
@@ -263,30 +300,12 @@ export default function CommonRoom() {
                         ))}
                       </div>
                     )}
-
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                       <div style={{ position: 'relative', flex: 1 }}>
-                        <textarea 
-                          ref={replyTextareaRef}
-                          placeholder="Write a reply..." 
-                          value={replyText} 
-                          onChange={(e) => setReplyText(e.target.value)} 
-                          onKeyDown={(e) => handleReplyKeyDown(e, post.id)}
-                          autoFocus
-                          rows={1}
-                          style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none', backgroundColor: '#f8fafc', resize: 'none', overflow: 'hidden', minHeight: '40px', fontFamily: 'inherit' }} 
-                        />
-                        <button 
-                          onClick={() => setShowReplyEmojiPicker(!showReplyEmojiPicker)} 
-                          style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}
-                        >
-                          <Smile size={18} />
-                        </button>
+                        <textarea ref={replyTextareaRef} placeholder="Write a reply..." value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => handleReplyKeyDown(e, post.id)} autoFocus rows={1} style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none', backgroundColor: '#f8fafc', resize: 'none', overflow: 'hidden', minHeight: '40px', fontFamily: 'inherit' }} />
+                        <button onClick={() => setShowReplyEmojiPicker(!showReplyEmojiPicker)} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}><Smile size={18} /></button>
                       </div>
-                      
-                      <button onClick={() => handleReplySubmit(post.id)} disabled={replyLoading} style={{ backgroundColor: 'var(--sky-blue)', color: 'white', border: 'none', borderRadius: '12px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                        {replyLoading ? '...' : <Send size={16} />}
-                      </button>
+                      <button onClick={() => handleReplySubmit(post.id)} disabled={replyLoading} style={{ backgroundColor: 'var(--sky-blue)', color: 'white', border: 'none', borderRadius: '12px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>{replyLoading ? '...' : <Send size={16} />}</button>
                     </div>
                   </div>
                 )}

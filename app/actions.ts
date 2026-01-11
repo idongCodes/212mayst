@@ -210,6 +210,7 @@ export type Post = {
   timestamp: string;
   editCount: number; 
   replies?: Reply[]; // Now 'Reply' is defined above
+  image?: string;
 };
 
 export async function getPosts(): Promise<Post[]> {
