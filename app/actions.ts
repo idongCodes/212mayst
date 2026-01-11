@@ -1,6 +1,6 @@
 /**
  * file: app/actions.ts
- * description: Fixed Type Error by adding .select('*') to all user queries.
+ * description: Fixed TypeScript error by changing 'null' to 'undefined' for profile pics.
  */
 
 "use server";
@@ -310,6 +310,7 @@ export type Reply = {
   content: string;
   timestamp: string;
   editCount: number;
+  authorProfilePic?: string; 
 };
 
 export type Post = {
@@ -321,10 +322,12 @@ export type Post = {
   replies?: Reply[];
   image?: string; 
   video?: string; 
+  authorProfilePic?: string;
 };
 
 export async function getPosts(): Promise<Post[]> {
-  const { data, error } = await supabase
+  // 1. Fetch Posts and Replies
+  const { data: postsData, error } = await supabase
     .from('posts')
     .select(`
       *,
@@ -334,7 +337,22 @@ export async function getPosts(): Promise<Post[]> {
 
   if (error) return [];
 
-  return data.map((p: any) => ({
+  // 2. Fetch Users to map Profile Pics
+  const { data: users } = await supabase
+    .from('users')
+    .select('first_name, alias, profile_pic');
+
+  // 3. Create a lookup map: "Name/Alias" -> "ProfilePicURL"
+  const userMap: Record<string, string> = {};
+  if (users) {
+    users.forEach((u: any) => {
+      if (u.alias) userMap[u.alias] = u.profile_pic;
+      if (u.first_name) userMap[u.first_name] = u.profile_pic;
+    });
+  }
+
+  // 4. Map posts and attach profile pics
+  return postsData.map((p: any) => ({
     id: Number(p.id),
     author: p.author,
     content: p.content,
@@ -342,12 +360,14 @@ export async function getPosts(): Promise<Post[]> {
     image: p.image_url,
     video: p.video_url,
     editCount: p.edit_count || 0,
+    authorProfilePic: userMap[p.author] || undefined, // FIX: Use undefined instead of null
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
       content: r.content,
       timestamp: r.timestamp,
-      editCount: r.edit_count || 0
+      editCount: r.edit_count || 0,
+      authorProfilePic: userMap[r.author] || undefined // FIX: Use undefined instead of null
     })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }));
 }
@@ -387,7 +407,6 @@ export async function addReply(postId: number, content: string, author: string) 
 
 // --- EDIT REPLY ---
 export async function editReply(replyId: number, newContent: string, requestorPhone: string) {
-  // FIX: Added .select('*')
   const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
   if (!user) return { success: false, message: "User verification failed" };
 
@@ -420,7 +439,6 @@ export async function editReply(replyId: number, newContent: string, requestorPh
 
 // --- EDIT POST ---
 export async function editPost(postId: number, newContent: string, requestorPhone: string) {
-  // FIX: Added .select('*')
   const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
   if (!user) return { success: false, message: "User verification failed" };
 
@@ -453,9 +471,7 @@ export async function editPost(postId: number, newContent: string, requestorPhon
 
 // --- DELETE POST ---
 export async function deletePost(id: number, requestorPhone: string) {
-  // FIX: Added .select('*')
   const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
-  
   const { data: post } = await supabase.from('posts').select('*').eq('id', id).single();
   
   if (!post || !user) return { success: false, message: "Not found" };
@@ -482,9 +498,7 @@ export async function deletePost(id: number, requestorPhone: string) {
 
 // --- DELETE REPLY ---
 export async function deleteReply(id: number, requestorPhone: string) {
-  // FIX: Added .select('*')
   const { data: user } = await supabase.from('users').select('*').eq('phone', normalizePhone(requestorPhone)).single();
-  
   const { data: reply } = await supabase.from('replies').select('*').eq('id', id).single();
   
   if (!reply || !user) return { success: false, message: "Not found" };
