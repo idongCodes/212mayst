@@ -1,6 +1,6 @@
 /**
  * file: app/common-room/page.tsx
- * description: UI passes User Phone to actions for secure Admin/Permission verification.
+ * description: Displays User Profile Photos on Posts & Replies.
  */
 
 "use client";
@@ -41,7 +41,8 @@ export default function CommonRoom() {
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
   
   const [authorName, setAuthorName] = useState("Guest");
-  const [userPhone, setUserPhone] = useState(""); // <--- Store Phone for API calls
+  const [userPhone, setUserPhone] = useState(""); 
+  const [currentUser, setCurrentUser] = useState<any>(null); // <--- Added to access profilePic
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false); 
 
@@ -63,10 +64,10 @@ export default function CommonRoom() {
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setAuthorName(user.alias || user.firstName);
-      setUserPhone(user.phone); // <--- Capture Phone
+      setUserPhone(user.phone);
+      setCurrentUser(user); // <--- Store full user object
       setIsGuest(false);
       
-      // Admin Check via Session Flag (Mapped from DB)
       if (user.isAdmin) {
         setIsAdmin(true);
       }
@@ -107,7 +108,17 @@ export default function CommonRoom() {
       const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
       mediaUrl = data.publicUrl;
     }
-    const newPost: Post = { id: Date.now(), author: authorName, content: message.trim(), timestamp: new Date().toISOString(), editCount: 0, replies: [], image: mediaType === 'image' ? mediaUrl : undefined, video: mediaType === 'video' ? mediaUrl : undefined };
+    const newPost: Post = { 
+      id: Date.now(), 
+      author: authorName, 
+      content: message.trim(), 
+      timestamp: new Date().toISOString(), 
+      editCount: 0, 
+      replies: [], 
+      image: mediaType === 'image' ? mediaUrl : undefined, 
+      video: mediaType === 'video' ? mediaUrl : undefined,
+      authorProfilePic: currentUser?.profilePic // <--- Optimistic Pic
+    };
     setPosts([newPost, ...posts]);
     setMessage(""); setSelectedFile(null); setPreviewUrl(""); setMediaType(null); setMediaError(""); setShowEmojiPicker(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -120,7 +131,14 @@ export default function CommonRoom() {
   const handleReplySubmit = async (postId: number) => {
     if (!replyText.trim()) return;
     setReplyLoading(true);
-    const newReply = { id: Date.now(), author: authorName, content: replyText.trim(), timestamp: new Date().toISOString(), editCount: 0 };
+    const newReply = { 
+      id: Date.now(), 
+      author: authorName, 
+      content: replyText.trim(), 
+      timestamp: new Date().toISOString(), 
+      editCount: 0,
+      authorProfilePic: currentUser?.profilePic // <--- Optimistic Pic
+    };
     const updatedPosts = posts.map(p => { if (p.id === postId) { return { ...p, replies: [...(p.replies || []), newReply] }; } return p; });
     setPosts(updatedPosts);
     setReplyText(""); setReplyingToId(null); setShowReplyEmojiPicker(false);
@@ -128,9 +146,8 @@ export default function CommonRoom() {
     setReplyLoading(false);
   };
 
-  // --- PERMISSION CHECKS ---
   const isEditable = (item: Post | Reply) => {
-    if (isAdmin) return true; // Admin/Self always editable if using phone check on server
+    if (isAdmin) return true;
     if (item.author === authorName) {
       if ((item.editCount || 0) >= 1) return false;
       return (Date.now() - new Date(item.timestamp).getTime()) < 15 * 60 * 1000;
@@ -144,13 +161,11 @@ export default function CommonRoom() {
     return (Date.now() - new Date(item.timestamp).getTime()) < 10 * 60 * 1000;
   };
 
-  // --- ACTIONS (Pass userPhone) ---
   const startEditing = (post: Post) => { setEditingId(post.id); setEditText(post.content); setReplyingToId(null); setEditingReplyId(null); };
   const cancelEditing = () => { setEditingId(null); setEditText(""); };
   const saveEdit = async () => { 
     if (!editingId || !editText.trim()) return; 
     setSaveLoading(true); 
-    // Pass userPhone for server verification
     const result = await editPost(editingId, editText.trim(), userPhone); 
     if (result.success) { setPosts(posts.map(p => p.id === editingId ? { ...p, content: editText.trim(), editCount: (p.editCount || 0) + 1 } : p)); setEditingId(null); setEditText(""); } else { alert(result.message); setEditingId(null); } setSaveLoading(false); 
   };
@@ -167,7 +182,6 @@ export default function CommonRoom() {
   const handleDeletePost = async (id: number) => {
     if (!confirm("Delete post?")) return;
     setPosts(posts.filter(p => p.id !== id));
-    // Pass userPhone for server verification
     const result = await deletePost(id, userPhone);
     if (!result.success) { alert(result.message); const data = await getPosts(); setPosts(data); }
   };
@@ -218,7 +232,16 @@ export default function CommonRoom() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {posts.map((post) => (
             <div key={post.id} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9', display: 'flex', gap: '15px' }}>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><User size={20} color="#0284c7" /></div>
+              
+              {/* AVATAR */}
+              <div style={{ width: '40px', height: '40px', backgroundColor: '#e0f2fe', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                {post.authorProfilePic ? (
+                  <img src={post.authorProfilePic} alt={post.author} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={20} color="#0284c7" />
+                )}
+              </div>
+
               <div style={{ flex: 1 }}>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
@@ -266,24 +289,36 @@ export default function CommonRoom() {
                 {post.replies && post.replies.length > 0 && (
                   <div style={{ marginTop: '1rem', borderLeft: '2px solid #f1f5f9', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {post.replies.map((reply) => (
-                      <div key={reply.id} style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                             <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{reply.author}</span>
-                             <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{formatDate(reply.timestamp)}{(reply.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(Edited)</span>}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                            {!editingReplyId && isEditable(reply) && <button onClick={() => startEditingReply(reply)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px' }} title="Edit Reply"><Pencil size={14} /></button>}
-                            {isDeletable(reply) && <button onClick={() => handleDeleteReply(reply.id, post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }} title="Delete Reply"><Trash2 size={14} /></button>}
-                          </div>
+                      <div key={reply.id} style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px', display: 'flex', gap: '10px' }}>
+                        
+                        {/* REPLY AVATAR */}
+                        <div style={{ width: '28px', height: '28px', backgroundColor: '#e2e8f0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                          {reply.authorProfilePic ? (
+                            <img src={reply.authorProfilePic} alt={reply.author} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <User size={14} color="#64748b" />
+                          )}
                         </div>
-                        {editingReplyId === reply.id ? (
-                           <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                             <input type="text" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveReplyEdit()} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--sky-blue)', outline: 'none', fontSize: '0.9rem' }} />
-                             <button onClick={saveReplyEdit} disabled={saveReplyLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#171717' }}><Check size={14} /></button>
-                             <button onClick={cancelEditingReply} style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#64748b' }}><X size={14} /></button>
-                           </div>
-                        ) : ( <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p> )}
+
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                               <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{reply.author}</span>
+                               <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{formatDate(reply.timestamp)}{(reply.editCount || 0) > 0 && <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(Edited)</span>}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                              {!editingReplyId && isEditable(reply) && <button onClick={() => startEditingReply(reply)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px' }} title="Edit Reply"><Pencil size={14} /></button>}
+                              {isDeletable(reply) && <button onClick={() => handleDeleteReply(reply.id, post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }} title="Delete Reply"><Trash2 size={14} /></button>}
+                            </div>
+                          </div>
+                          {editingReplyId === reply.id ? (
+                             <div className="animate-fade-in" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                               <input type="text" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveReplyEdit()} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--sky-blue)', outline: 'none', fontSize: '0.9rem' }} />
+                               <button onClick={saveReplyEdit} disabled={saveReplyLoading} style={{ background: 'var(--light-green)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#171717' }}><Check size={14} /></button>
+                               <button onClick={cancelEditingReply} style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#64748b' }}><X size={14} /></button>
+                             </div>
+                          ) : ( <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>{reply.content}</p> )}
+                        </div>
                       </div>
                     ))}
                   </div>
