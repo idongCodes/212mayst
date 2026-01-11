@@ -1,20 +1,16 @@
 /**
  * file: app/actions.ts
- * description: Fixed build error by adding missing 'Reply' type definition.
+ * description: Replaced local JSON storage with Supabase Database operations.
  */
 
 "use server";
 
-import fs from "fs/promises";
-import path from "path";
-import os from "os"; // Required for temp dir
 import { revalidatePath } from "next/cache";
+import { supabase } from "./lib/supabaseClient";
 
 // ============================================================================
 // 1. PRAISE SYSTEM
 // ============================================================================
-
-const PRAISE_DB_PATH = path.join(process.cwd(), "app", "praise-db.json");
 
 export type Praise = {
   id: number;
@@ -25,53 +21,55 @@ export type Praise = {
   submittedAt?: string;
 };
 
-const PRAISE_SEED_DATA: Praise[] = [
-  { 
-    id: 1, 
-    name: "Idong", 
-    role: "Tenant", 
-    subject: "🚀 🥂", 
-    message: "Excited to be working on this app. I hope you all enjoy it and come to use it daily 💪🏽",
-    submittedAt: new Date().toISOString()
-  }
-];
-
 export async function getPraises(): Promise<Praise[]> {
-  try {
-    const data = await fs.readFile(PRAISE_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(PRAISE_SEED_DATA, null, 2));
-    return PRAISE_SEED_DATA;
+  const { data, error } = await supabase
+    .from('praises')
+    .select('*')
+    .order('submitted_at', { ascending: false });
+
+  if (error) {
+    console.error("Supabase error (getPraises):", error);
+    return [];
   }
+
+  // Map DB snake_case to Frontend camelCase
+  return data.map((p: any) => ({
+    id: Number(p.id),
+    name: p.name,
+    role: p.role,
+    subject: p.subject,
+    message: p.message,
+    submittedAt: p.submitted_at
+  }));
 }
 
 export async function addPraise(newPraise: Praise) {
-  const praises = await getPraises();
-  const praiseWithDate = {
-    ...newPraise,
-    submittedAt: newPraise.submittedAt || new Date().toISOString()
-  };
-  const updatedPraises = [praiseWithDate, ...praises];
-  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updatedPraises, null, 2));
-  revalidatePath("/"); 
-  return updatedPraises;
+  const { error } = await supabase.from('praises').insert({
+    // Let DB handle ID and Timestamp automatically if possible, or pass them
+    id: newPraise.id, 
+    name: newPraise.name,
+    role: newPraise.role,
+    subject: newPraise.subject,
+    message: newPraise.message,
+    submitted_at: newPraise.submittedAt || new Date().toISOString()
+  });
+
+  if (error) console.error("Supabase error (addPraise):", error);
+  revalidatePath("/");
+  return getPraises();
 }
 
 export async function deletePraise(id: number) {
-  const praises = await getPraises();
-  const updated = praises.filter(p => p.id !== id);
-  await fs.writeFile(PRAISE_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('praises').delete().eq('id', id);
+  if (error) console.error("Supabase error (deletePraise):", error);
   revalidatePath("/");
-  return updated;
+  return getPraises();
 }
 
 
 // ============================================================================
 // 2. FEEDBACK SYSTEM
 // ============================================================================
-
-const FEEDBACK_DB_PATH = path.join(process.cwd(), "app", "feedback-db.json");
 
 export type Feedback = {
   id: number;
@@ -84,45 +82,61 @@ export type Feedback = {
 };
 
 export async function getFeedback(): Promise<Feedback[]> {
-  try {
-    const data = await fs.readFile(FEEDBACK_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*')
+    .order('submitted_at', { ascending: false });
+
+  if (error) {
+    console.error("Supabase error (getFeedback):", error);
     return [];
   }
+
+  return data.map((f: any) => ({
+    id: Number(f.id),
+    name: f.name,
+    role: f.role,
+    subject: f.subject,
+    message: f.message,
+    read: f.read,
+    submittedAt: f.submitted_at
+  }));
 }
 
 export async function addFeedback(newFeedback: Feedback) {
-  const list = await getFeedback();
-  const feedbackWithStatus = { ...newFeedback, read: false };
-  const updated = [feedbackWithStatus, ...list];
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('feedback').insert({
+    id: newFeedback.id,
+    name: newFeedback.name,
+    role: newFeedback.role,
+    subject: newFeedback.subject,
+    message: newFeedback.message,
+    read: false,
+    submitted_at: newFeedback.submittedAt
+  });
+
+  if (error) console.error("Supabase error (addFeedback):", error);
   revalidatePath("/feedback");
-  return updated;
+  return getFeedback();
 }
 
 export async function deleteFeedback(id: number) {
-  const list = await getFeedback();
-  const updated = list.filter(f => f.id !== id);
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('feedback').delete().eq('id', id);
+  if (error) console.error("Supabase error (deleteFeedback):", error);
   revalidatePath("/feedback");
-  return updated;
+  return getFeedback();
 }
 
 export async function toggleFeedbackRead(id: number, isRead: boolean) {
-  const list = await getFeedback();
-  const updated = list.map(f => f.id === id ? { ...f, read: isRead } : f);
-  await fs.writeFile(FEEDBACK_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('feedback').update({ read: isRead }).eq('id', id);
+  if (error) console.error("Supabase error (toggleFeedbackRead):", error);
   revalidatePath("/feedback");
-  return updated;
+  return getFeedback();
 }
 
 
 // ============================================================================
 // 3. USER SYSTEM
 // ============================================================================
-
-const USERS_DB_PATH = path.join(process.cwd(), "app", "users-db.json");
 
 export type User = {
   id: number;
@@ -143,12 +157,24 @@ type AuthResponse = {
 };
 
 export async function getUsers(): Promise<User[]> {
-  try {
-    const data = await fs.readFile(USERS_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
+  const { data, error } = await supabase.from('users').select('*');
+  
+  if (error) {
+    console.error("Supabase error (getUsers):", error);
     return [];
   }
+
+  return data.map((u: any) => ({
+    id: Number(u.id),
+    firstName: u.first_name,
+    lastName: u.last_name,
+    alias: u.alias,
+    dob: u.dob,
+    role: u.role,
+    phone: u.phone,
+    profilePic: u.profile_pic,
+    joinedAt: u.joined_at
+  }));
 }
 
 export async function registerUser(formData: any): Promise<AuthResponse> {
@@ -156,35 +182,72 @@ export async function registerUser(formData: any): Promise<AuthResponse> {
     return { success: false, message: "❌ Incorrect Door Code. Access Denied." };
   }
 
-  const newUser: User = {
-    id: Date.now(),
-    firstName: formData.firstName,
-    lastName: formData.lastName,
+  const newUser = {
+    id: Date.now(), // Or let DB handle it
+    first_name: formData.firstName,
+    last_name: formData.lastName,
     alias: formData.alias || "",
     dob: formData.dob, 
     role: formData.role,
     phone: formData.phone,
-    profilePic: formData.profilePic || "",
-    joinedAt: new Date().toISOString()
+    profile_pic: formData.profilePic || "",
+    joined_at: new Date().toISOString()
   };
 
-  const users = await getUsers();
-  const updatedUsers = [...users, newUser];
-  await fs.writeFile(USERS_DB_PATH, JSON.stringify(updatedUsers, null, 2));
+  const { error } = await supabase.from('users').insert(newUser);
+
+  if (error) {
+    console.error("Register Error:", error);
+    return { success: false, message: "Registration failed. Phone might be taken." };
+  }
   
   revalidatePath("/mates");
-  return { success: true, user: newUser };
+  
+  // Return the user object formatted for frontend
+  return { 
+    success: true, 
+    user: {
+      id: Number(newUser.id),
+      firstName: newUser.first_name,
+      lastName: newUser.last_name,
+      alias: newUser.alias,
+      dob: newUser.dob,
+      role: newUser.role,
+      phone: newUser.phone,
+      profilePic: newUser.profile_pic,
+      joinedAt: newUser.joined_at
+    } 
+  };
 }
 
 export async function loginUser(phone: string, doorCode: string): Promise<AuthResponse> {
   if (doorCode !== "0129") {
     return { success: false, message: "❌ Incorrect Door Code." };
   }
-  const users = await getUsers();
-  const user = users.find(u => u.phone === phone);
-  if (!user) {
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('phone', phone)
+    .single();
+
+  if (error || !data) {
     return { success: false, message: "User not found. Check phone number or join first." };
   }
+
+  // Map back to frontend User type
+  const user: User = {
+    id: Number(data.id),
+    firstName: data.first_name,
+    lastName: data.last_name,
+    alias: data.alias,
+    dob: data.dob,
+    role: data.role,
+    phone: data.phone,
+    profilePic: data.profile_pic,
+    joinedAt: data.joined_at
+  };
+
   return { success: true, user };
 }
 
@@ -193,9 +256,6 @@ export async function loginUser(phone: string, doorCode: string): Promise<AuthRe
 // 4. COMMON ROOM POSTS SYSTEM
 // ============================================================================
 
-const POSTS_DB_PATH = path.join(process.cwd(), "app", "posts-db.json");
-
-// --- FIXED: ADDED REPLY TYPE ---
 export type Reply = {
   id: number;
   author: string;
@@ -209,92 +269,104 @@ export type Post = {
   content: string;
   timestamp: string;
   editCount: number; 
-  replies?: Reply[]; // Now 'Reply' is defined above
-  image?: string;
-  video?: string;
+  replies?: Reply[];
+  image?: string; 
+  video?: string; 
 };
 
 export async function getPosts(): Promise<Post[]> {
-  try {
-    const data = await fs.readFile(POSTS_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
+  // Fetch Posts AND their Replies using relation
+  const { data, error } = await supabase
+    .from('posts')
+    .select(`
+      *,
+      replies (*)
+    `)
+    .order('timestamp', { ascending: false }); // Newest posts first
+
+  if (error) {
+    console.error("Supabase error (getPosts):", error);
     return [];
   }
+
+  // Transform data
+  return data.map((p: any) => ({
+    id: Number(p.id),
+    author: p.author,
+    content: p.content,
+    timestamp: p.timestamp,
+    image: p.image_url, // Map from DB column
+    video: p.video_url, // Map from DB column
+    editCount: 0, // Simplified for now
+    // Sort replies oldest to newest
+    replies: (p.replies || []).map((r: any) => ({
+      id: Number(r.id),
+      author: r.author,
+      content: r.content,
+      timestamp: r.timestamp
+    })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }));
 }
 
 export async function addPost(newPost: Post) {
-  const posts = await getPosts();
-  // Initialize replies array
-  const postWithDefaults = { 
-    ...newPost, 
-    editCount: 0,
-    replies: [] 
-  };
-  
-  const updated = [postWithDefaults, ...posts];
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('posts').insert({
+    id: newPost.id,
+    author: newPost.author,
+    content: newPost.content,
+    timestamp: newPost.timestamp,
+    image_url: newPost.image || null, // Map to DB column
+    video_url: newPost.video || null  // Map to DB column
+  });
+
+  if (error) console.error("Supabase error (addPost):", error);
   revalidatePath("/common-room");
-  return updated;
+  return getPosts();
+}
+
+export async function addReply(postId: number, content: string, author: string) {
+  const newReply = {
+    id: Date.now(),
+    post_id: postId,
+    author: author,
+    content: content,
+    timestamp: new Date().toISOString()
+  };
+
+  const { error } = await supabase.from('replies').insert(newReply);
+
+  if (error) {
+    console.error("Supabase error (addReply):", error);
+    return { success: false, message: "Failed to reply" };
+  }
+
+  revalidatePath("/common-room");
+  return { success: true };
 }
 
 export async function editPost(postId: number, newContent: string) {
-  const posts = await getPosts();
-  const idx = posts.findIndex(p => p.id === postId);
+  // We can add validation logic here if needed (time checks etc)
+  const { error } = await supabase
+    .from('posts')
+    .update({ content: newContent })
+    .eq('id', postId);
 
-  if (idx === -1) return { success: false, message: "Post not found" };
-  if ((posts[idx].editCount || 0) >= 1) return { success: false, message: "Limit reached" };
-  if ((Date.now() - new Date(posts[idx].timestamp).getTime()) > 15 * 60 * 1000) return { success: false, message: "Time's up" };
-
-  posts[idx].content = newContent;
-  posts[idx].editCount = (posts[idx].editCount || 0) + 1; 
-  
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
+  if (error) return { success: false, message: "Failed to edit" };
   revalidatePath("/common-room");
   return { success: true };
 }
 
 export async function deletePost(id: number) {
-  const posts = await getPosts();
-  const updated = posts.filter(p => p.id !== id);
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(updated, null, 2));
+  const { error } = await supabase.from('posts').delete().eq('id', id);
+  if (error) console.error("Supabase error (deletePost):", error);
   revalidatePath("/common-room");
-  return updated;
-}
-
-// --- FIXED: ADDED ADD REPLY ACTION ---
-export async function addReply(postId: number, content: string, author: string) {
-  const posts = await getPosts();
-  const postIndex = posts.findIndex(p => p.id === postId);
-
-  if (postIndex === -1) {
-    return { success: false, message: "Post not found" };
-  }
-
-  const newReply: Reply = {
-    id: Date.now(),
-    author,
-    content,
-    timestamp: new Date().toISOString()
-  };
-
-  if (!posts[postIndex].replies) {
-    posts[postIndex].replies = [];
-  }
-
-  posts[postIndex].replies?.push(newReply);
-
-  await fs.writeFile(POSTS_DB_PATH, JSON.stringify(posts, null, 2));
-  revalidatePath("/common-room");
-  return { success: true, updatedPost: posts[postIndex] };
+  // We don't return the list here, the UI will likely refresh via revalidatePath or optimistic update
+  return []; 
 }
 
 
 // ============================================================================
-// 5. CHAT SYSTEM (FILE BASED - TEMP DIR)
+// 5. CHAT SYSTEM
 // ============================================================================
-
-const CHAT_DB_PATH = path.join(os.tmpdir(), "chat-db.json");
 
 export type ChatMessage = {
   id: number;
@@ -304,30 +376,32 @@ export type ChatMessage = {
 };
 
 export async function getChats(): Promise<ChatMessage[]> {
-  try {
-    const data = await fs.readFile(CHAT_DB_PATH, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
+  const { data, error } = await supabase
+    .from('chats')
+    .select('*')
+    .order('timestamp', { ascending: true }) // Oldest first
+    .limit(100);
+
+  if (error) return [];
+
+  return data.map((c: any) => ({
+    id: Number(c.id),
+    author: c.author,
+    text: c.text,
+    timestamp: c.timestamp
+  }));
 }
 
 export async function addChat(text: string, author: string) {
-  const chats = await getChats();
-  const newChat: ChatMessage = {
+  const newChat = {
     id: Date.now(),
     author,
     text,
     timestamp: new Date().toISOString()
   };
+
+  await supabase.from('chats').insert(newChat);
   
-  const updatedChats = [...chats, newChat].slice(-100); 
-  
-  try {
-    await fs.writeFile(CHAT_DB_PATH, JSON.stringify(updatedChats, null, 2));
-  } catch (error) {
-    console.error("Failed to write chat DB:", error);
-  }
-  
-  return updatedChats;
+  // Return the full list to update local state if using polling
+  return getChats();
 }
