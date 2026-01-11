@@ -140,7 +140,14 @@ export default function Navigation() {
     }
   }, [messages, isChatOpen, isNearBottom]);
 
-  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); revalidatePath('/'); };
+  const handleLogout = () => { 
+    sessionStorage.removeItem('212user'); 
+    setIsLoggedIn(false); 
+    router.push('/'); 
+    revalidatePath('/'); 
+    // Dispatch custom event for immediate UI updates
+    window.dispatchEvent(new CustomEvent('user-logout'));
+  };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;

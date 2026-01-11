@@ -28,10 +28,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null); 
   const [isAdmin, setIsAdmin] = useState(false); 
+  const userRef = useRef(user); // Ref to track user state for interval check
 
   const [praiseForm, setPraiseForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
   const [feedbackForm, setFeedbackForm] = useState({ name: "", role: "Tenant", subject: "", message: "" });
   const [feedbackStatus, setFeedbackStatus] = useState("idle"); 
+
+  // Update ref when user changes
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]); 
 
   // --- ADMIN STATE ---
   const [userPhone, setUserPhone] = useState(""); 
@@ -88,6 +94,45 @@ useEffect(() => {
       }
     };
     loadData();
+
+    // Listen for storage changes (logout) - works across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === '212user' && !e.newValue) {
+        // User was logged out
+        setUser(null);
+        setIsAdmin(false);
+        setUserPhone("");
+        setPraiseForm({ name: "", role: "Tenant", subject: "", message: "" });
+        setFeedbackForm({ name: "", role: "Tenant", subject: "", message: "" });
+      }
+    };
+
+    // Listen for custom logout event - works within same tab
+    const handleLogout = () => {
+      setUser(null);
+      setIsAdmin(false);
+      setUserPhone("");
+      setPraiseForm({ name: "", role: "Tenant", subject: "", message: "" });
+      setFeedbackForm({ name: "", role: "Tenant", subject: "", message: "" });
+    };
+
+    // Periodic check for sessionStorage changes (fallback)
+    const intervalCheck = setInterval(() => {
+      const storedUser = sessionStorage.getItem('212user');
+      if (!storedUser && userRef.current) {
+        // User was logged out but state didn't update
+        handleLogout();
+      }
+    }, 1000);
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('user-logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('user-logout', handleLogout);
+      clearInterval(intervalCheck);
+    };
   }, []);
 
   const handlePraiseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -271,15 +316,15 @@ useEffect(() => {
       boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
       flexShrink: 0 
     }}>
-    {/* Check if p.userImage exists (and is not null/empty) */}
-    {(p as any).userImage ? (
+    {/* Only show user image if user is logged in and image exists */}
+    {user && (p as any).userImage ? (
       <img 
         src={(p as any).userImage} 
         alt={p.name} 
         style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
       />
     ) : (
-      // Fallback if no image
+      // Always show fallback User icon when logged out or no image
       <User size={24} color="#9ca3af" />
     )}
   </div>
