@@ -46,6 +46,9 @@ export default function Navigation() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [lastReadMessageId, setLastReadMessageId] = useState<number | null>(null);
+  const [showNotification, setShowNotification] = useState(false);
 
   // 1. Auth & Login Check
   useEffect(() => {
@@ -129,6 +132,11 @@ export default function Navigation() {
           if (isNearBottom) {
              setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
           }
+          
+          // Track unread messages when chat is closed
+          if (!isChatOpen && payload.new.id) {
+            setUnreadCount(prev => prev + 1);
+          }
         }
       )
       .subscribe();
@@ -136,9 +144,25 @@ export default function Navigation() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isLoggedIn, isNearBottom]);
+  }, [isLoggedIn, isNearBottom, isChatOpen]);
 
-  // 5. Click outside to close chat
+  // Reset unread count when chat is opened
+  useEffect(() => {
+    if (isChatOpen) {
+      setUnreadCount(0);
+      setShowNotification(false);
+      if (messages.length > 0) {
+        setLastReadMessageId(messages[messages.length - 1].id);
+      }
+    }
+  }, [isChatOpen, messages]);
+
+  // Show notification when there are unread messages
+  useEffect(() => {
+    if (unreadCount > 0 && !isChatOpen && !showNotification) {
+      setShowNotification(true);
+    }
+  }, [unreadCount, isChatOpen]);
   const chatPopupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -267,7 +291,29 @@ export default function Navigation() {
             <Link href="/mates" style={getLinkStyle("/mates")} title="Mates"><Users size={24} /></Link>
             <Link href="/notifications" style={getLinkStyle("/notifications")} title="Notifications"><Bell size={24} /></Link>
             <Link href="/about" style={getLinkStyle("/about")} title="About"><Info size={24} /></Link>
-            <button onClick={() => setIsChatOpen(!isChatOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isChatOpen ? 'var(--sandy-brown)' : '#9ca3af', padding: 0 }} title="Chat"><MessageCircle size={24} /></button>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button onClick={() => setIsChatOpen(!isChatOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isChatOpen ? 'var(--sandy-brown)' : '#9ca3af', padding: 0 }} title="Chat"><MessageCircle size={24} /></button>
+              {unreadCount > 0 && !isChatOpen && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  borderRadius: '50%',
+                  minWidth: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '1'
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
           </>
         )}
         <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
@@ -488,6 +534,30 @@ export default function Navigation() {
             </div>
           )}
         </>
+      )}
+
+      {/* NEW MESSAGE NOTIFICATION */}
+      {showNotification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#ef4444',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          fontSize: '0.9rem',
+          fontWeight: 'bold',
+          animation: 'slideInRight 0.3s ease-out forwards',
+          maxWidth: '300px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageCircle size={20} />
+            <span>{unreadCount} new message{unreadCount > 1 ? 's' : ''}</span>
+          </div>
+        </div>
       )}
     </>
   );
