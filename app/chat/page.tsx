@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Smile, Image as ImageIcon, MessageCircle, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { addChat, getChats, ChatMessage } from '../actions';
+import { addChat, getChats, getUsers, ChatMessage } from '../actions';
 
 // ... [Keep COMMON_EMOJIS and MOCK_GIFS arrays as is] ...
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
@@ -22,19 +22,36 @@ export default function ChatPage() {
   const [messageText, setMessageText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [userMap, setUserMap] = useState<Record<string, string>>({}); // Map: "Name" -> "PicUrl"
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
 
-  // 1. Auth Check
+  // 1. Auth Check & User Data Fetch
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('212user');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    } else {
-      router.push('/login');
-    }
+    const initializeData = async () => {
+      const storedUser = sessionStorage.getItem('212user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        setCurrentUser(user);
+        
+        // Fetch user avatars
+        const users = await getUsers();
+        const map: Record<string, string> = {};
+        users.forEach(u => {
+          if (u.profilePic) {
+            map[u.firstName] = u.profilePic;
+            if (u.alias) map[u.alias] = u.profilePic;
+          }
+        });
+        setUserMap(map);
+      } else {
+        router.push('/login');
+      }
+    };
+    
+    initializeData();
   }, [router]);
 
   // 2. Poll for messages (Smart Update)
@@ -132,9 +149,35 @@ export default function ChatPage() {
         ) : (
           messages.map((msg) => {
             const isMe = currentUser && (msg.author === (currentUser.alias || currentUser.firstName));
+            const avatarSrc = userMap[msg.author];
+            
             return (
               <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '70%', display: 'flex', gap: '10px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: isMe ? '#e0f2fe' : '#ffffff', color: isMe ? '#0284c7' : '#64748b', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 'bold', flexShrink: 0 }}>{getInitial(msg.author)}</div>
+                <div style={{ 
+                  width: '36px', 
+                  height: '36px', 
+                  borderRadius: '50%', 
+                  backgroundColor: isMe ? '#e0f2fe' : '#ffffff', 
+                  color: isMe ? '#0284c7' : '#64748b', 
+                  border: '1px solid #e2e8f0', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '0.9rem', 
+                  fontWeight: 'bold', 
+                  flexShrink: 0,
+                  overflow: 'hidden'
+                }}>
+                  {avatarSrc ? (
+                    <img 
+                      src={avatarSrc} 
+                      alt={msg.author} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  ) : (
+                    getInitial(msg.author)
+                  )}
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                   {!isMe && <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px' }}>{msg.author}</span>}
                   <div style={{ backgroundColor: isMe ? 'var(--sandy-brown)' : 'white', color: isMe ? 'white' : '#334155', padding: '12px 16px', borderRadius: '20px', borderTopRightRadius: isMe ? '4px' : '20px', borderTopLeftRadius: isMe ? '20px' : '4px', fontSize: '1rem', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', lineHeight: '1.5', wordWrap: 'break-word' }}>{msg.text}</div>
