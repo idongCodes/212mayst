@@ -296,25 +296,37 @@ export default function Navigation() {
                       <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
                         
                         {/* AVATAR */}
-                        <div style={{ 
-                          width: '28px', height: '28px', borderRadius: '50%', 
-                          backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', 
-                          color: isMe ? '#0284c7' : '#64748b',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.75rem', fontWeight: 'bold',
-                          flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)',
-                          overflow: 'hidden' 
-                        }}>
+                        <ClickableUser 
+                          user={users.find(u => u.firstName === msg.author || u.alias === msg.author) || { firstName: msg.author, lastName: '' }} 
+                          currentUser={currentUser}
+                          style={{ 
+                            width: '28px', height: '28px', borderRadius: '50%', 
+                            backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9', 
+                            color: isMe ? '#0284c7' : '#64748b',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.75rem', fontWeight: 'bold',
+                            flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)',
+                            overflow: 'hidden' 
+                          }}
+                        >
                           {avatarSrc ? (
                             <img src={avatarSrc} alt={msg.author} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             getInitial(msg.author)
                           )}
-                        </div>
+                        </ClickableUser>
 
                         {/* MESSAGE */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
-                          {!isMe && <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px' }}>{msg.author}</div>}
+                          {!isMe && (
+                            <ClickableUser 
+                              user={users.find(u => u.firstName === msg.author || u.alias === msg.author) || { firstName: msg.author, lastName: '' }} 
+                              currentUser={currentUser}
+                              style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px', marginLeft: '4px', cursor: 'pointer' }}
+                            >
+                              {msg.author}
+                            </ClickableUser>
+                          )}
                           
                           {/* ADMIN CONTROLS */}
                           {isAdmin && !isEditing && (

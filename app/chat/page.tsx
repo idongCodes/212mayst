@@ -261,15 +261,13 @@ export default function ChatPage() {
                   )}
                 </ClickableUser>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', position: 'relative' }}>
-                  {!isMe && (
-                    <ClickableUser 
-                      user={messageUser || { firstName: msg.author, lastName: '' }} 
-                      currentUser={currentUser}
-                      style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px', cursor: 'pointer' }}
-                    >
-                      {msg.author}
-                    </ClickableUser>
-                  )}
+                  <ClickableUser 
+                    user={messageUser || { firstName: msg.author, lastName: '' }} 
+                    currentUser={currentUser}
+                    style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px', cursor: 'pointer' }}
+                  >
+                    {msg.author}
+                  </ClickableUser>
                   
                   {/* ADMIN CONTROLS */}
                   {isAdmin && !isEditing && (

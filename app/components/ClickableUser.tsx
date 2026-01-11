@@ -29,13 +29,18 @@ export default function ClickableUser({ user, currentUser, children, style }: Cl
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isLongPress, setIsLongPress] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
 
-  // Generate profile slug
-  const slug = `${user.firstName.toLowerCase()}-${user.lastName.toLowerCase()}`;
+  // Generate profile slug - handle missing lastName
+  const firstName = user.firstName || 'unknown';
+  const lastName = user.lastName || '';
+  const slug = lastName ? `${firstName.toLowerCase()}-${lastName.toLowerCase()}` : firstName.toLowerCase();
 
   const handleMouseDown = () => {
+    setIsLongPress(false);
     const timer = setTimeout(() => {
+      setIsLongPress(true);
       setShowModal(true);
     }, 500); // 500ms for long press
     setPressTimer(timer);
@@ -57,14 +62,16 @@ export default function ClickableUser({ user, currentUser, children, style }: Cl
 
   const handleClick = (e: React.MouseEvent) => {
     // Only handle click if it wasn't a long press
-    if (pressTimer) {
+    if (!isLongPress) {
       e.preventDefault();
       router.push(`/profiles/${slug}`);
     }
   };
 
   const handleTouchStart = () => {
+    setIsLongPress(false);
     const timer = setTimeout(() => {
+      setIsLongPress(true);
       setShowModal(true);
     }, 500); // 500ms for long press
     setPressTimer(timer);
