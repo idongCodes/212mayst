@@ -1,6 +1,6 @@
 /**
  * file: app/actions.ts
- * description: Server Actions with Profile Pic support for Posts/Replies.
+ * description: Fixed TypeScript error by changing 'null' to 'undefined' for profile pics.
  */
 
 "use server";
@@ -310,7 +310,7 @@ export type Reply = {
   content: string;
   timestamp: string;
   editCount: number;
-  authorProfilePic?: string; // <--- ADDED
+  authorProfilePic?: string; 
 };
 
 export type Post = {
@@ -321,8 +321,8 @@ export type Post = {
   editCount: number; 
   replies?: Reply[];
   image?: string; 
-  video?: string;
-  authorProfilePic?: string; // <--- ADDED
+  video?: string; 
+  authorProfilePic?: string;
 };
 
 export async function getPosts(): Promise<Post[]> {
@@ -360,14 +360,14 @@ export async function getPosts(): Promise<Post[]> {
     image: p.image_url,
     video: p.video_url,
     editCount: p.edit_count || 0,
-    authorProfilePic: userMap[p.author] || null, // <--- ATTACH PIC
+    authorProfilePic: userMap[p.author] || undefined, // FIX: Use undefined instead of null
     replies: (p.replies || []).map((r: any) => ({
       id: Number(r.id),
       author: r.author,
       content: r.content,
       timestamp: r.timestamp,
       editCount: r.edit_count || 0,
-      authorProfilePic: userMap[r.author] || null // <--- ATTACH PIC
+      authorProfilePic: userMap[r.author] || undefined // FIX: Use undefined instead of null
     })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }));
 }
