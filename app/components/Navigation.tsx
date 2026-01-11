@@ -11,6 +11,7 @@ import { Home, Armchair, Bed, Users, Bell, Info, MessageCircle, LogOut, LogIn, M
 import { useEffect, useState, useRef } from "react";
 import { addChat, getChats, ChatMessage, getUsers } from "../actions"; 
 import { supabase } from "../lib/supabaseClient"; // <--- Import Supabase Client
+import { revalidatePath } from 'next/cache';
 
 const COMMON_EMOJIS = ["😀", "😂", "😍", "🥳", "😎", "😭", "😡", "🤔", "👍", "👎", "🔥", "❤️", "✨", "🎉", "🏠", "🍺", "🍕", "🌮", "👀", "🚀", "💡", "💪", "😴", "👋"];
 const MOCK_GIFS = [{ id: 1, label: "Hi!", color: "#fca5a5" }, { id: 2, label: "Party", color: "#fcd34d" }, { id: 3, label: "No", color: "#86efac" }, { id: 4, label: "Love", color: "#93c5fd" }, { id: 5, label: "Sad", color: "#d8b4fe" }, { id: 6, label: "Yes", color: "#fda4af" }];
@@ -134,7 +135,7 @@ export default function Navigation() {
     }
   }, [messages, isChatOpen, isNearBottom]);
 
-  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); };
+  const handleLogout = () => { sessionStorage.removeItem('212user'); setIsLoggedIn(false); router.push('/'); revalidatePath('/'); };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
